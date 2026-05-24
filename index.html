@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#06061a" />
+    <title>Slime Pop Protocol</title>
+    <!-- TODO (CrazyGames): when shipping, include the CrazyGames SDK script here:
+         <script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>
+         The CrazyGamesAdapter inside src/game/systems is a safe no-op fallback. -->
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #06061a;
+        color: #e7f6ff;
+      }
+      body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      #game-root {
+        position: relative;
+        width: 100vw;
+        height: 100vh;
+        background: radial-gradient(ellipse at center, #0a0c2a 0%, #03030d 80%);
+      }
+      #game-root canvas {
+        display: block;
+        margin: 0 auto;
+        image-rendering: pixelated;
+        image-rendering: crisp-edges;
+      }
+      #boot-overlay {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #06061a;
+        color: #6ffcff;
+        font-size: 14px;
+        letter-spacing: 2px;
+        z-index: 5;
+        pointer-events: none;
+        transition: opacity 0.45s ease;
+      }
+      #boot-overlay.hidden { opacity: 0; }
+      .pulse {
+        animation: pulse 1.2s ease-in-out infinite;
+      }
+      @keyframes pulse {
+        0%, 100% { opacity: 0.45; }
+        50%      { opacity: 1; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="game-root">
+      <div id="boot-overlay"><span class="pulse">BOOTING CONTAINMENT GRID...</span></div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
