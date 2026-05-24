@@ -3,6 +3,7 @@ import { COLORS, FONT_FAMILY, GAME_HEIGHT, GAME_WIDTH, SCENES } from "../constan
 import { audio } from "../systems/AudioSystem";
 import { CrazyGamesAdapter } from "../systems/CrazyGamesAdapter";
 import type { SaveSystem } from "../systems/SaveSystem";
+import { addChromeButton, addGlassPanel, addSceneBackdrop } from "../ui/SceneChrome";
 import { formatScore } from "../utils/math";
 
 export type GameOverData = {
@@ -25,8 +26,10 @@ export class GameOverScene extends Phaser.Scene {
     const save = this.registry.get("save") as SaveSystem | undefined;
     save?.recordRun({ level: data.levelReached, score: data.score, scrap: data.scrap });
 
-    const overlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x06061a, 0.92);
+    addSceneBackdrop(this, "danger");
+    const overlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x06061a, 0.55);
     overlay.setInteractive();
+    addGlassPanel(this, GAME_WIDTH / 2, 285, 540, 350, COLORS.warning, 0.88);
 
     const headline = this.add.text(GAME_WIDTH / 2, 130, "CONTAINMENT FAILED", {
       fontFamily: FONT_FAMILY,
@@ -77,25 +80,7 @@ export class GameOverScene extends Phaser.Scene {
   }
 
   private buildButton(x: number, y: number, label: string, color: number, cb: () => void): void {
-    const bg = this.add.rectangle(x, y, 220, 40, 0x121542, 0.95);
-    bg.setStrokeStyle(2, color, 1);
-    bg.setInteractive({ useHandCursor: true });
-    const lbl = this.add.text(x, y, label, {
-      fontFamily: FONT_FAMILY,
-      fontStyle: "900",
-      fontSize: "16px",
-      color: "#e7f6ff",
-    });
-    lbl.setOrigin(0.5);
-    bg.on("pointerover", () => {
-      bg.setStrokeStyle(3, COLORS.neonPink, 1);
-      lbl.setColor("#ffd166");
-    });
-    bg.on("pointerout", () => {
-      bg.setStrokeStyle(2, color, 1);
-      lbl.setColor("#e7f6ff");
-    });
-    bg.on("pointerdown", () => {
+    addChromeButton(this, x, y, 230, 42, label, color, () => {
       audio.uiClick();
       cb();
     });

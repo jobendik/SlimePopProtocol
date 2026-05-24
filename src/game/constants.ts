@@ -16,30 +16,34 @@ export const GAME_HEIGHT = 540;
  * Procedural textures are generated at this multiple of their logical size,
  * then every sprite consumer applies `setScale(LOGICAL_SCALE)` so positions,
  * physics bodies and level data stay in 960x540 world units while textures
- * carry 4× the pixel data — much crisper when the canvas is upscaled by the
+ * carry extra pixel data — much crisper when the canvas is upscaled by the
  * browser to fit large iframes / fullscreen.
  *
- * Trade-off: 4× texture memory.  Negligible here (a few dozen tiny textures,
- * largest is the 80×80 portal → 160×160 = 26 KB even at RGBA).
+ * Trade-off: more texture memory. Negligible here (a few dozen tiny textures,
+ * largest is the 80×80 portal → 240×240 = 230 KB even at RGBA).
  */
-export const TEX_SUPERSAMPLE = 2;
+export const TEX_SUPERSAMPLE = 3;
 export const LOGICAL_SCALE = 1 / TEX_SUPERSAMPLE;
 
 /** Centralised colour palette so every scene/system stays on-brand. */
 export const COLORS = {
   bgDeep: 0x06061a,
-  bgMid: 0x0a0c2a,
-  bgFar: 0x121542,
-  bgRim: 0x1d2470,
+  bgMid: 0x0a0f2e,
+  bgFar: 0x101847,
+  bgRim: 0x26318a,
   neonCyan: 0x6ffcff,
   neonCyanDim: 0x2f8c95,
   neonPink: 0xff6cf2,
   neonGold: 0xffd166,
   neonGreen: 0x9efc7a,
   neonOrange: 0xffa45a,
-  platformBase: 0x232a55,
+  platformBase: 0x202a5b,
   platformEdge: 0x6ffcff,
-  platformShadow: 0x080814,
+  platformShadow: 0x070918,
+  steelDark: 0x141b3d,
+  steelMid: 0x2f3c7e,
+  glass: 0xcfe9ff,
+  glassDark: 0x152047,
   scrap: 0xffd166,
   battery: 0x6ffcff,
   text: 0xe7f6ff,

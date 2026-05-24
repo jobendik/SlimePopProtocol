@@ -48,6 +48,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       (this.width - bodyWidth) / 2,
       this.height - bodyHeight
     );
+    this.body.updateFromGameObject();
     this.setCollideWorldBounds(true);
     this.body.setMaxVelocity(380, PLAYER.maxFallSpeed);
     this.body.setDragX(PLAYER.drag);

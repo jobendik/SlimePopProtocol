@@ -17,26 +17,36 @@ export class Hud {
   private upgradeRow: Phaser.GameObjects.Container;
   private upgradeRowChildren: Phaser.GameObjects.GameObject[] = [];
   private hint?: Phaser.GameObjects.Text;
+  private hintBg?: Phaser.GameObjects.Graphics;
+  private hintTimer?: Phaser.Time.TimerEvent;
   private shieldIcon?: Phaser.GameObjects.Image;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
 
     const panel = scene.add.graphics();
-    panel.fillStyle(0x06061a, 0.6);
-    panel.fillRoundedRect(8, 8, 240, 38, 8);
+    panel.fillStyle(0x000000, 0.22);
+    panel.fillRoundedRect(12, 12, 276, 44, 8);
+    panel.fillStyle(0x070b22, 0.82);
+    panel.fillRoundedRect(8, 8, 276, 44, 8);
+    panel.lineStyle(2, COLORS.neonCyan, 0.55);
+    panel.strokeRoundedRect(8, 8, 276, 44, 8);
+    panel.fillStyle(COLORS.neonCyan, 0.65);
+    panel.fillRect(24, 8, 96, 3);
+    panel.fillStyle(0xffffff, 0.06);
+    panel.fillRoundedRect(12, 12, 268, 15, 6);
     panel.setDepth(DEPTH.hud);
 
     // Hearts — textures baked at TEX_SUPERSAMPLE× density.
     for (let i = 0; i < PLAYER.maxHearts; i++) {
-      const h = scene.add.image(28 + i * 22, 27, TEX.heart);
+      const h = scene.add.image(30 + i * 28, 27, TEX.heart);
       h.setDepth(DEPTH.hud + 1);
       h.setScale(LOGICAL_SCALE);
       this.hearts.push(h);
     }
 
     // Level label
-    this.levelLabel = scene.add.text(120, 18, "LEVEL 1", {
+    this.levelLabel = scene.add.text(142, 18, "LEVEL 1", {
       fontFamily: FONT_FAMILY,
       fontStyle: "bold",
       fontSize: "12px",
@@ -47,23 +57,33 @@ export class Hud {
 
     // Score
     const scorePanel = scene.add.graphics();
-    scorePanel.fillStyle(0x06061a, 0.6);
-    scorePanel.fillRoundedRect(GAME_WIDTH - 248, 8, 240, 38, 8);
+    scorePanel.fillStyle(0x000000, 0.22);
+    scorePanel.fillRoundedRect(GAME_WIDTH - 276, 12, 264, 44, 8);
+    scorePanel.fillStyle(0x070b22, 0.82);
+    scorePanel.fillRoundedRect(GAME_WIDTH - 280, 8, 272, 44, 8);
+    scorePanel.lineStyle(2, COLORS.neonGold, 0.55);
+    scorePanel.strokeRoundedRect(GAME_WIDTH - 280, 8, 272, 44, 8);
+    scorePanel.fillStyle(COLORS.neonGold, 0.7);
+    scorePanel.fillRect(GAME_WIDTH - 112, 8, 82, 3);
+    scorePanel.fillStyle(0xffffff, 0.06);
+    scorePanel.fillRoundedRect(GAME_WIDTH - 276, 12, 264, 15, 6);
     scorePanel.setDepth(DEPTH.hud);
 
-    this.scoreLabel = scene.add.text(GAME_WIDTH - 16, 18, "0", {
+    this.scoreLabel = scene.add.text(GAME_WIDTH - 18, 16, "0", {
       fontFamily: FONT_FAMILY,
       fontStyle: "bold",
-      fontSize: "20px",
+      fontSize: "22px",
       color: "#e7f6ff",
+      stroke: "#06061a",
+      strokeThickness: 3,
     });
     this.scoreLabel.setOrigin(1, 0);
     this.scoreLabel.setDepth(DEPTH.hud + 1);
 
-    this.scrapIcon = scene.add.image(GAME_WIDTH - 220, 33, TEX.scrap);
+    this.scrapIcon = scene.add.image(GAME_WIDTH - 248, 33, TEX.scrap);
     this.scrapIcon.setDepth(DEPTH.hud + 1);
     this.scrapIcon.setScale(LOGICAL_SCALE);
-    this.scrapLabel = scene.add.text(GAME_WIDTH - 208, 33, "0", {
+    this.scrapLabel = scene.add.text(GAME_WIDTH - 236, 33, "0", {
       fontFamily: FONT_FAMILY,
       fontStyle: "bold",
       fontSize: "12px",
@@ -75,10 +95,10 @@ export class Hud {
     this.comboLabel = scene.add.text(GAME_WIDTH / 2, 30, "", {
       fontFamily: FONT_FAMILY,
       fontStyle: "900",
-      fontSize: "22px",
+      fontSize: "24px",
       color: "#ff6cf2",
       stroke: "#06061a",
-      strokeThickness: 4,
+      strokeThickness: 5,
     });
     this.comboLabel.setOrigin(0.5);
     this.comboLabel.setDepth(DEPTH.hud + 1);
@@ -131,9 +151,11 @@ export class Hud {
     this.upgradeRowChildren.forEach((c) => c.destroy());
     this.upgradeRowChildren = [];
     entries.forEach((e, idx) => {
-      const x = idx * 30;
-      const circle = this.scene.add.circle(x + 12, 12, 11, e.color, 0.25);
-      circle.setStrokeStyle(1.5, e.color, 0.95);
+      const x = idx * 34;
+      const back = this.scene.add.rectangle(x + 14, 14, 28, 28, 0x070b22, 0.86);
+      back.setStrokeStyle(1, e.color, 0.65);
+      const circle = this.scene.add.circle(x + 14, 14, 10, e.color, 0.24);
+      circle.setStrokeStyle(1.4, e.color, 0.95);
       const txt = this.scene.add.text(x + 12, 12, e.icon, {
         fontFamily: FONT_FAMILY,
         fontStyle: "bold",
@@ -141,14 +163,19 @@ export class Hud {
         color: "#ffffff",
       });
       txt.setOrigin(0.5);
+      txt.setPosition(x + 14, 14);
+      this.upgradeRow.add(back);
       this.upgradeRow.add(circle);
       this.upgradeRow.add(txt);
-      this.upgradeRowChildren.push(circle, txt);
+      this.upgradeRowChildren.push(back, circle, txt);
       if (e.stacks > 1) {
-        const stackLbl = this.scene.add.text(x + 22, 20, `x${e.stacks}`, {
+        const stackLbl = this.scene.add.text(x + 24, 22, `x${e.stacks}`, {
           fontFamily: FONT_FAMILY,
+          fontStyle: "bold",
           fontSize: "10px",
           color: "#ffd166",
+          stroke: "#06061a",
+          strokeThickness: 2,
         });
         this.upgradeRow.add(stackLbl);
         this.upgradeRowChildren.push(stackLbl);
@@ -158,10 +185,11 @@ export class Hud {
 
   setShield(active: boolean): void {
     if (active && !this.shieldIcon) {
-      this.shieldIcon = this.scene.add.image(160, 26, TEX.particle);
+      this.shieldIcon = this.scene.add.image(258, 29, TEX.particle);
       this.shieldIcon.setTint(0xcfe9ff);
-      this.shieldIcon.setScale(1.2 * LOGICAL_SCALE);
+      this.shieldIcon.setScale(1.35 * LOGICAL_SCALE);
       this.shieldIcon.setDepth(DEPTH.hud + 1);
+      this.shieldIcon.setBlendMode(Phaser.BlendModes.ADD);
     } else if (!active && this.shieldIcon) {
       this.shieldIcon.destroy();
       this.shieldIcon = undefined;
@@ -169,47 +197,78 @@ export class Hud {
   }
 
   showHint(text: string, durationMs = 4500): void {
+    this.hintTimer?.remove();
     this.hint?.destroy();
+    this.hintBg?.destroy();
+    const width = Math.min(620, Math.max(260, text.length * 9 + 36));
+    this.hintBg = this.scene.add.graphics();
+    this.hintBg.fillStyle(0x000000, 0.22);
+    this.hintBg.fillRoundedRect(GAME_WIDTH / 2 - width / 2 + 5, 68, width, 34, 8);
+    this.hintBg.fillStyle(0x090d24, 0.9);
+    this.hintBg.fillRoundedRect(GAME_WIDTH / 2 - width / 2, 64, width, 34, 8);
+    this.hintBg.lineStyle(2, COLORS.neonGold, 0.8);
+    this.hintBg.strokeRoundedRect(GAME_WIDTH / 2 - width / 2, 64, width, 34, 8);
+    this.hintBg.fillStyle(COLORS.neonGold, 0.35);
+    this.hintBg.fillRect(GAME_WIDTH / 2 - width / 2 + 14, 64, width - 28, 2);
+    this.hintBg.setDepth(DEPTH.hud + 1);
+    this.hintBg.setAlpha(0);
+
     this.hint = this.scene.add.text(GAME_WIDTH / 2, 80, text, {
       fontFamily: FONT_FAMILY,
       fontStyle: "bold",
       fontSize: "14px",
       color: "#ffd166",
-      backgroundColor: "#06061a",
-      padding: { x: 12, y: 6 },
+      stroke: "#06061a",
+      strokeThickness: 3,
     } as Phaser.Types.GameObjects.Text.TextStyle);
     this.hint.setOrigin(0.5);
-    this.hint.setDepth(DEPTH.hud + 1);
+    this.hint.setDepth(DEPTH.hud + 2);
     this.hint.setAlpha(0);
 
     this.scene.tweens.add({
-      targets: this.hint,
+      targets: [this.hint, this.hintBg],
       alpha: 1,
       duration: 220,
     });
-    this.scene.time.delayedCall(durationMs, () => {
-      if (!this.hint) return;
+    this.hintTimer = this.scene.time.delayedCall(durationMs, () => {
+      if (!this.hint || !this.hintBg) return;
       const target = this.hint;
+      const bg = this.hintBg;
       this.scene.tweens.add({
-        targets: target,
+        targets: [target, bg],
         alpha: 0,
         duration: 320,
-        onComplete: () => target.destroy(),
+        onComplete: () => {
+          target.destroy();
+          bg.destroy();
+        },
       });
       this.hint = undefined;
+      this.hintBg = undefined;
+      this.hintTimer = undefined;
     });
   }
 
   clearHint(): void {
-    if (!this.hint) return;
+    this.hintTimer?.remove();
+    this.hintTimer = undefined;
+    if (!this.hint && !this.hintBg) return;
     const target = this.hint;
+    const bg = this.hintBg;
+    const fadeTargets = [target, bg].filter(
+      (obj): obj is Phaser.GameObjects.Text | Phaser.GameObjects.Graphics => !!obj
+    );
     this.scene.tweens.add({
-      targets: target,
+      targets: fadeTargets,
       alpha: 0,
       duration: 220,
-      onComplete: () => target.destroy(),
+      onComplete: () => {
+        target?.destroy();
+        bg?.destroy();
+      },
     });
     this.hint = undefined;
+    this.hintBg = undefined;
   }
 }
 

@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { COLORS, DEPTH, FIELD, LOGICAL_SCALE, TEX } from "../constants";
+import { COLORS, DEPTH, FIELD, GAME_HEIGHT, LOGICAL_SCALE, TEX } from "../constants";
 import type { SlimeEnemy } from "./SlimeEnemy";
 
 /**
@@ -24,6 +24,8 @@ export class ContainmentField extends Phaser.Physics.Arcade.Image {
 
   private timeBornForFlight: number;
   private pulsePhase = 0;
+  private flightVelocityX = 0;
+  private flightVelocityY = 0;
 
   constructor(scene: Phaser.Scene, x: number, y: number, radius: number, pierce: boolean) {
     super(scene, x, y, TEX.field);
@@ -32,20 +34,28 @@ export class ContainmentField extends Phaser.Physics.Arcade.Image {
     scene.add.existing(this);
     scene.physics.add.existing(this);
     this.setDepth(DEPTH.field);
-    this.body.setCircle(24, 0, 0);
+    // Circle bodies use source pixels; this keeps body radius equal to the
+    // requested world radius after the supersampled texture is scaled down.
+    const fieldScale = (radius / 24) * LOGICAL_SCALE;
+    this.setScale(fieldScale);
+    this.body.setCircle(radius / fieldScale, 0, 0);
+    this.body.updateFromGameObject();
     this.body.setAllowGravity(false);
     this.body.setBounce(FIELD.bounceDamping);
-    // Texture is baked at TEX_SUPERSAMPLE× pixel density — fold LOGICAL_SCALE
-    // into the radius-based scale so the displayed size matches world units.
-    this.setScale((radius / 24) * LOGICAL_SCALE);
+    this.body.moves = false;
+    this.keepAboveFloor();
+    this.syncBodyToVisual();
     this.timeBornForFlight = scene.time.now;
     this.spawnedAt = this.timeBornForFlight;
     this.expiresAt = this.timeBornForFlight + FIELD.emptyLifetimeMs;
   }
 
   launch(vx: number, vy: number): void {
-    this.body.setVelocity(vx, vy);
+    this.flightVelocityX = vx;
+    this.flightVelocityY = vy;
+    this.body.setVelocity(0, 0);
     this.body.setAllowGravity(false);
+    this.body.moves = false;
   }
 
   /** Capture a slime — switches to "trapped" state. */
@@ -55,7 +65,7 @@ export class ContainmentField extends Phaser.Physics.Arcade.Image {
     this.trapped = slime;
     this.trapExpiresAt = time + trapDurationMs;
     this.setTexture(TEX.fieldTrapped);
-    this.body.setVelocity(0, -FIELD.floatSpeed);
+    this.body.setVelocity(0, 0);
     this.body.setAllowGravity(false);
     slime.onTrapped(this);
   }
@@ -65,7 +75,7 @@ export class ContainmentField extends Phaser.Physics.Arcade.Image {
     return this.state !== "popping";
   }
 
-  override update(time: number, _delta: number): void {
+  override update(time: number, delta: number): void {
     if (this.state === "popping") return;
 
     // wobble pulse — baseScale folds in LOGICAL_SCALE so the supersample
@@ -76,12 +86,23 @@ export class ContainmentField extends Phaser.Physics.Arcade.Image {
     this.setScale(baseScale * pulse, baseScale * (2 - pulse));
 
     if (this.state === "flying") {
+      const ageRatio = Phaser.Math.Clamp(
+        (time - this.timeBornForFlight) / FIELD.emptyLifetimeMs,
+        0,
+        1
+      );
+      const currentVelocityY = Phaser.Math.Linear(this.flightVelocityY, -FIELD.floatSpeed, ageRatio);
+      const dt = delta / 1000;
+      this.x += this.flightVelocityX * dt;
+      this.y += currentVelocityY * dt;
+      this.keepAboveFloor();
+      this.syncBodyToVisual();
+
       if (time >= this.expiresAt) {
         this.fizzle();
         return;
       }
       // mild colour shift as it ages
-      const ageRatio = (time - this.timeBornForFlight) / FIELD.emptyLifetimeMs;
       if (ageRatio > 0.66) {
         this.setTint(0xfff7a0);
       } else {
@@ -90,6 +111,9 @@ export class ContainmentField extends Phaser.Physics.Arcade.Image {
     }
 
     if (this.state === "trapped" && this.trapped) {
+      this.y -= FIELD.floatSpeed * (delta / 1000);
+      this.syncBodyToVisual();
+
       // Slime follows the field, with small wobble
       const slime = this.trapped;
       slime.x = this.x;
@@ -107,13 +131,21 @@ export class ContainmentField extends Phaser.Physics.Arcade.Image {
         this.setAlpha(1);
       }
 
-      // Float upward steadily
-      this.body.setVelocityY(-FIELD.floatSpeed);
-
       if (time >= this.trapExpiresAt) {
         this.releaseTrapped();
       }
     }
+  }
+
+  private keepAboveFloor(): void {
+    this.y = Math.min(this.y, GAME_HEIGHT - 32 - this.radius - 1);
+  }
+
+  private syncBodyToVisual(): void {
+    this.body.reset(this.x, this.y);
+    this.body.setAllowGravity(false);
+    this.body.setVelocity(0, 0);
+    this.body.moves = false;
   }
 
   /** Pop logic — caller (GameScene) handles score, chain, FX. */

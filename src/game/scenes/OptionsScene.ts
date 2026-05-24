@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import { COLORS, FONT_FAMILY, GAME_HEIGHT, GAME_WIDTH, SCENES } from "../constants";
 import { audio } from "../systems/AudioSystem";
 import type { SaveSystem } from "../systems/SaveSystem";
+import { addGlassPanel, addSceneBackdrop } from "../ui/SceneChrome";
 
 type SliderRow = {
   label: Phaser.GameObjects.Text;
@@ -32,14 +33,16 @@ export class OptionsScene extends Phaser.Scene {
   create(): void {
     this.save = this.registry.get("save") as SaveSystem;
 
-    const bg = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, COLORS.bgDeep);
-    bg.setAlpha(1);
+    addSceneBackdrop(this, "blue");
+    addGlassPanel(this, GAME_WIDTH / 2, GAME_HEIGHT / 2 + 4, 620, 430, COLORS.neonCyan, 0.8);
 
     const title = this.add.text(GAME_WIDTH / 2, 50, "OPTIONS", {
       fontFamily: FONT_FAMILY,
       fontStyle: "900",
       fontSize: "32px",
       color: "#6ffcff",
+      stroke: "#06061a",
+      strokeThickness: 4,
     });
     title.setOrigin(0.5);
 
@@ -159,7 +162,7 @@ export class OptionsScene extends Phaser.Scene {
     });
     lbl.setOrigin(0, 0.5);
 
-    const bar = this.add.rectangle(GAME_WIDTH / 2 + 40, y, 240, 10, 0x222a55);
+    const bar = this.add.rectangle(GAME_WIDTH / 2 + 40, y, 244, 14, 0x10173a, 0.95);
     bar.setStrokeStyle(1, COLORS.neonCyan, 0.6);
     bar.setInteractive({ useHandCursor: true });
 
@@ -168,7 +171,8 @@ export class OptionsScene extends Phaser.Scene {
       y,
       240 * get(),
       8,
-      COLORS.neonCyan
+      COLORS.neonCyan,
+      0.92
     );
     fill.setOrigin(0, 0.5);
 
@@ -216,7 +220,7 @@ export class OptionsScene extends Phaser.Scene {
     });
     lbl.setOrigin(0, 0.5);
 
-    const swatch = this.add.rectangle(GAME_WIDTH / 2 + 60, y, 120, 28, 0x222a55, 1);
+    const swatch = this.add.rectangle(GAME_WIDTH / 2 + 60, y, 132, 30, 0x10173a, 1);
     swatch.setStrokeStyle(2, COLORS.neonCyan, 0.8);
     swatch.setInteractive({ useHandCursor: true });
 

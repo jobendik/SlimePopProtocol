@@ -31,19 +31,22 @@ export abstract class SlimeEnemy extends Phaser.Physics.Arcade.Sprite {
     this.setScale(LOGICAL_SCALE);
     this.setCollideWorldBounds(true);
     this.body.setBounce(0, 0);
+    this.syncBodyToTexture();
+    this.bornAt = scene.time.now;
+    this.direction = Math.random() < 0.5 ? -1 : 1;
+  }
+
+  protected syncBodyToTexture(inset = 4): void {
     // Arcade bodies are sized in source pixels and then multiplied by scale.
     // The intended body is the displayed slime minus a small forgiving inset.
-    const bodyWidth = (this.displayWidth - 4) / LOGICAL_SCALE;
-    const bodyHeight = (this.displayHeight - 4) / LOGICAL_SCALE;
+    const bodyWidth = (this.displayWidth - inset) / LOGICAL_SCALE;
+    const bodyHeight = (this.displayHeight - inset) / LOGICAL_SCALE;
     this.body.setSize(bodyWidth, bodyHeight);
-    // Center horizontally and bottom-align vertically so visual slime bottoms
-    // rest on platforms instead of sinking into them.
     this.body.setOffset(
       (this.width - bodyWidth) / 2,
       this.height - bodyHeight
     );
-    this.bornAt = scene.time.now;
-    this.direction = Math.random() < 0.5 ? -1 : 1;
+    this.body.updateFromGameObject();
   }
 
   /** Called from GameScene each frame; sub-classes implement AI. */
@@ -282,6 +285,7 @@ export class ShieldSlime extends SlimeEnemy {
       this.shielded = this.hp > 1;
       if (!this.shielded) {
         this.setTexture(TEX.slimeBasic);
+        this.syncBodyToTexture();
         this.setTint(0x9efc7a);
       }
     }

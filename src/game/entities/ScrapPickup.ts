@@ -28,7 +28,8 @@ export class ScrapPickup extends Phaser.Physics.Arcade.Image {
     scene.physics.add.existing(this);
     // Texture baked at TEX_SUPERSAMPLE× density.
     this.setScale(LOGICAL_SCALE);
-    this.body.setCircle(7, 0, 0);
+    this.body.setCircle(7 / LOGICAL_SCALE, 0, 0);
+    this.body.updateFromGameObject();
     this.body.setBounce(0.5);
     this.body.setDragX(120);
     this.body.setVelocity(

@@ -11,7 +11,15 @@ export class PreloadScene extends Phaser.Scene {
   }
 
   create(): void {
-    // Visual: simple loading bar while we generate textures
+    const bg = this.add.graphics();
+    bg.fillStyle(COLORS.bgDeep, 1);
+    bg.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    bg.fillStyle(COLORS.bgFar, 0.6);
+    bg.fillCircle(GAME_WIDTH / 2, GAME_HEIGHT / 2, 220);
+    bg.fillStyle(COLORS.neonCyan, 0.08);
+    bg.fillCircle(GAME_WIDTH / 2, GAME_HEIGHT / 2, 145);
+
+    // Visual: loading bar while we generate textures
     const bar = this.add.graphics();
     const label = this.add.text(
       GAME_WIDTH / 2,
@@ -27,7 +35,9 @@ export class PreloadScene extends Phaser.Scene {
 
     const drawBar = (p: number) => {
       bar.clear();
-      bar.fillStyle(0x121542, 1);
+      bar.fillStyle(0x000000, 0.25);
+      bar.fillRoundedRect(GAME_WIDTH / 2 - 164, GAME_HEIGHT / 2 - 8, 328, 16, 6);
+      bar.fillStyle(0x10173a, 1);
       bar.fillRoundedRect(GAME_WIDTH / 2 - 160, GAME_HEIGHT / 2 - 6, 320, 12, 4);
       bar.fillStyle(COLORS.neonCyan, 1);
       bar.fillRoundedRect(
@@ -36,6 +46,14 @@ export class PreloadScene extends Phaser.Scene {
         Math.max(0, 312 * p),
         4,
         2
+      );
+      bar.fillStyle(0xffffff, 0.45);
+      bar.fillRoundedRect(
+        GAME_WIDTH / 2 - 156,
+        GAME_HEIGHT / 2 - 2,
+        Math.max(0, 312 * p),
+        1,
+        1
       );
     };
     drawBar(0.1);

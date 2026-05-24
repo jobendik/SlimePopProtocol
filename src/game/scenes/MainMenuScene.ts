@@ -13,10 +13,12 @@ import {
 import { LEVEL_COUNT } from "../data/levels";
 import { audio } from "../systems/AudioSystem";
 import type { SaveSystem } from "../systems/SaveSystem";
+import { addChromeButton, addSceneBackdrop } from "../ui/SceneChrome";
 
 type MenuButton = {
   bg: Phaser.GameObjects.Rectangle;
   label: Phaser.GameObjects.Text;
+  edge: Phaser.GameObjects.Rectangle;
 };
 
 export class MainMenuScene extends Phaser.Scene {
@@ -45,65 +47,29 @@ export class MainMenuScene extends Phaser.Scene {
   }
 
   private buildBackground(): void {
-    const g = this.add.graphics();
-    g.fillStyle(COLORS.bgDeep, 1);
-    g.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
-
-    const grad = this.add.graphics();
-    grad.fillStyle(0x0c1244, 0.6);
-    grad.fillCircle(GAME_WIDTH * 0.7, GAME_HEIGHT * 0.4, 320);
-    grad.fillStyle(COLORS.neonPink, 0.06);
-    grad.fillCircle(GAME_WIDTH * 0.25, GAME_HEIGHT * 0.7, 260);
-
-    // floor strip
-    const floor = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT - 26, GAME_WIDTH, 60, 0x121542);
-    floor.setStrokeStyle(2, COLORS.neonCyan, 1);
-
-    // floating sparks — particle texture baked at TEX_SUPERSAMPLE× density.
-    for (let i = 0; i < 18; i++) {
-      const dot = this.add.image(
-        Phaser.Math.Between(0, GAME_WIDTH),
-        Phaser.Math.Between(0, GAME_HEIGHT - 80),
-        TEX.particle
-      );
-      dot.setTint(i % 3 === 0 ? COLORS.neonPink : COLORS.neonCyan);
-      dot.setAlpha(0.5);
-      dot.setScale((0.4 + Math.random() * 0.6) * LOGICAL_SCALE);
-      this.tweens.add({
-        targets: dot,
-        y: dot.y - 40 - Math.random() * 80,
-        alpha: 0,
-        duration: 2400 + Math.random() * 2000,
-        repeat: -1,
-        yoyo: false,
-        delay: Math.random() * 2000,
-        onRepeat: () => {
-          dot.y = GAME_HEIGHT + 20;
-          dot.x = Phaser.Math.Between(0, GAME_WIDTH);
-          dot.setAlpha(0.5);
-        },
-      });
-    }
+    addSceneBackdrop(this, "blue");
   }
 
   private buildTitle(): void {
-    const t = this.add.text(GAME_WIDTH / 2, 110, GAME_TITLE.toUpperCase(), {
+    const titleX = GAME_WIDTH * 0.36;
+    const t = this.add.text(titleX, 104, GAME_TITLE.toUpperCase(), {
       fontFamily: FONT_FAMILY,
       fontStyle: "900",
-      fontSize: "52px",
+      fontSize: "48px",
       color: "#6ffcff",
       stroke: "#06061a",
       strokeThickness: 6,
       letterSpacing: 4,
     } as Phaser.Types.GameObjects.Text.TextStyle);
     t.setOrigin(0.5);
-    t.setShadow(0, 4, "#0d1b3a", 8, false, true);
+    t.setShadow(0, 5, "#0d1b3a", 10, false, true);
 
-    const sub = this.add.text(GAME_WIDTH / 2, 160, "Containment Arcade", {
+    const sub = this.add.text(titleX, 155, "Containment Arcade", {
       fontFamily: FONT_FAMILY,
       fontSize: "16px",
       color: "#ff6cf2",
       fontStyle: "bold",
+      letterSpacing: 3,
     });
     sub.setOrigin(0.5);
 
@@ -124,38 +90,45 @@ export class MainMenuScene extends Phaser.Scene {
       { label: "OPTIONS", action: () => this.scene.start(SCENES.Options) },
     ];
 
-    const startY = 250;
+    const startY = 258;
+    const buttonX = GAME_WIDTH * 0.34;
     for (let i = 0; i < this.items.length; i++) {
       const y = startY + i * 56;
-      const bg = this.add.rectangle(GAME_WIDTH / 2, y, 260, 44, 0x121542, 0.7);
-      bg.setStrokeStyle(2, COLORS.neonCyan, 0.8);
-      bg.setInteractive({ useHandCursor: true });
-      bg.on("pointerover", () => this.select(i));
-      bg.on("pointerdown", () => {
+      const button = addChromeButton(this, buttonX, y, 280, 44, this.items[i].label, COLORS.neonCyan, () => {
         audio.uiClick();
         this.items[i].action();
       });
-
-      const label = this.add.text(GAME_WIDTH / 2, y, this.items[i].label, {
-        fontFamily: FONT_FAMILY,
-        fontStyle: "bold",
-        fontSize: "18px",
-        color: "#e7f6ff",
-      });
-      label.setOrigin(0.5);
-
-      this.buttons.push({ bg, label });
+      button.bg.on("pointerover", () => this.select(i));
+      this.buttons.push(button);
     }
     this.select(0);
   }
 
   private buildHeroPreview(): void {
-    const heroX = GAME_WIDTH * 0.78;
-    const heroY = GAME_HEIGHT * 0.55;
+    const heroX = GAME_WIDTH * 0.74;
+    const heroY = GAME_HEIGHT * 0.58;
+    const platform = this.add.image(heroX, heroY + 74, TEX.platform);
+    platform.setDisplaySize(260, 34);
+    platform.setDepth(1);
+
+    const ring = this.add.image(heroX - 6, heroY - 6, TEX.shockwave);
+    ring.setTint(COLORS.neonCyan);
+    ring.setAlpha(0.35);
+    ring.setScale(3.3 * LOGICAL_SCALE);
+    ring.setBlendMode(Phaser.BlendModes.ADD);
+    this.tweens.add({
+      targets: ring,
+      angle: 360,
+      duration: 9000,
+      repeat: -1,
+      ease: "Linear",
+    });
+
     // All textures baked at TEX_SUPERSAMPLE× density — every scale is multiplied
     // by LOGICAL_SCALE so the on-screen size matches the original design.
     const bot = this.add.image(heroX, heroY, TEX.player);
-    bot.setScale(2.4 * LOGICAL_SCALE);
+    bot.setScale(3.1 * LOGICAL_SCALE);
+    bot.setDepth(2);
 
     this.tweens.add({
       targets: bot,
@@ -166,24 +139,26 @@ export class MainMenuScene extends Phaser.Scene {
       ease: "Sine.easeInOut",
     });
 
-    const slime = this.add.image(heroX - 50, heroY + 30, TEX.slimeBasic);
-    slime.setScale(1.6 * LOGICAL_SCALE);
+    const slime = this.add.image(heroX - 74, heroY + 42, TEX.slimeBasic);
+    slime.setScale(2.25 * LOGICAL_SCALE);
+    slime.setDepth(2);
     this.tweens.add({
       targets: slime,
-      scaleX: 1.7 * LOGICAL_SCALE,
-      scaleY: 1.5 * LOGICAL_SCALE,
+      scaleX: 2.4 * LOGICAL_SCALE,
+      scaleY: 2.05 * LOGICAL_SCALE,
       duration: 600,
       yoyo: true,
       repeat: -1,
       ease: "Sine.easeInOut",
     });
 
-    const field = this.add.image(heroX - 24, heroY - 30, TEX.field);
-    field.setScale(1.6 * LOGICAL_SCALE);
+    const field = this.add.image(heroX - 38, heroY - 38, TEX.field);
+    field.setScale(2.2 * LOGICAL_SCALE);
     field.setBlendMode(Phaser.BlendModes.ADD);
+    field.setDepth(3);
     this.tweens.add({
       targets: field,
-      scale: 1.85 * LOGICAL_SCALE,
+      scale: 2.55 * LOGICAL_SCALE,
       alpha: 0.7,
       duration: 900,
       yoyo: true,
@@ -253,11 +228,13 @@ export class MainMenuScene extends Phaser.Scene {
     this.buttons.forEach((btn, idx) => {
       if (idx === i) {
         btn.bg.setStrokeStyle(3, COLORS.neonPink, 1);
-        btn.bg.setFillStyle(0x1c2a4a, 0.9);
+        btn.bg.setFillStyle(0x17204d, 0.96);
+        btn.edge.setFillStyle(COLORS.neonPink, 0.85);
         btn.label.setColor("#ffd166");
       } else {
-        btn.bg.setStrokeStyle(2, COLORS.neonCyan, 0.5);
-        btn.bg.setFillStyle(0x121542, 0.7);
+        btn.bg.setStrokeStyle(2, COLORS.neonCyan, 0.58);
+        btn.bg.setFillStyle(0x10173a, 0.88);
+        btn.edge.setFillStyle(COLORS.neonCyan, 0.45);
         btn.label.setColor("#e7f6ff");
       }
     });

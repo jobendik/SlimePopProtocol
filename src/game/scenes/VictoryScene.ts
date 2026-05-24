@@ -3,6 +3,7 @@ import { COLORS, FONT_FAMILY, GAME_HEIGHT, GAME_WIDTH, LOGICAL_SCALE, SCENES, TE
 import { audio } from "../systems/AudioSystem";
 import { CrazyGamesAdapter } from "../systems/CrazyGamesAdapter";
 import type { SaveSystem } from "../systems/SaveSystem";
+import { addChromeButton, addGlassPanel, addSceneBackdrop } from "../ui/SceneChrome";
 import { formatScore } from "../utils/math";
 
 export type VictoryData = {
@@ -24,8 +25,10 @@ export class VictoryScene extends Phaser.Scene {
     const save = this.registry.get("save") as SaveSystem | undefined;
     save?.recordRun({ level: 12, score: data.score, scrap: data.scrap });
 
-    const overlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x06061a, 0.92);
+    addSceneBackdrop(this, "victory");
+    const overlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x06061a, 0.42);
     overlay.setInteractive();
+    addGlassPanel(this, GAME_WIDTH / 2, 286, 540, 350, COLORS.neonGold, 0.84);
 
     // Confetti / sparks
     for (let i = 0; i < 60; i++) {
@@ -92,25 +95,7 @@ export class VictoryScene extends Phaser.Scene {
   }
 
   private buildButton(x: number, y: number, label: string, color: number, cb: () => void): void {
-    const bg = this.add.rectangle(x, y, 220, 40, 0x121542, 0.95);
-    bg.setStrokeStyle(2, color, 1);
-    bg.setInteractive({ useHandCursor: true });
-    const lbl = this.add.text(x, y, label, {
-      fontFamily: FONT_FAMILY,
-      fontStyle: "900",
-      fontSize: "16px",
-      color: "#e7f6ff",
-    });
-    lbl.setOrigin(0.5);
-    bg.on("pointerover", () => {
-      bg.setStrokeStyle(3, COLORS.neonPink, 1);
-      lbl.setColor("#ffd166");
-    });
-    bg.on("pointerout", () => {
-      bg.setStrokeStyle(2, color, 1);
-      lbl.setColor("#e7f6ff");
-    });
-    bg.on("pointerdown", () => {
+    addChromeButton(this, x, y, 230, 42, label, color, () => {
       audio.uiClick();
       cb();
     });

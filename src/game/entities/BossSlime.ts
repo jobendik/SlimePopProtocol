@@ -29,14 +29,14 @@ export class BossSlime extends Phaser.Physics.Arcade.Sprite {
     this.setScale(LOGICAL_SCALE);
     this.body.setAllowGravity(false);
     this.body.setImmovable(false);
-    this.body.setSize(BOSS.width - 16, BOSS.height - 16);
-    // Same Phaser quirk as Player: offset is in texture coords and gets
-    // multiplied by scaleX, so to keep the body centred on the displayed
-    // sprite we use `(textureSize - bodySize/scale) / 2`.
+    const bodyWidth = (BOSS.width - 16) / LOGICAL_SCALE;
+    const bodyHeight = (BOSS.height - 16) / LOGICAL_SCALE;
+    this.body.setSize(bodyWidth, bodyHeight);
     this.body.setOffset(
-      (this.width - (BOSS.width - 16) / LOGICAL_SCALE) / 2,
-      (this.height - (BOSS.height - 16) / LOGICAL_SCALE) / 2
+      (this.width - bodyWidth) / 2,
+      (this.height - bodyHeight) / 2
     );
+    this.body.updateFromGameObject();
     this.patrolMinX = patrolMinX;
     this.patrolMaxX = patrolMaxX;
     this.nextSpawnAt = scene.time.now + 1500;

@@ -1,6 +1,7 @@
 import Phaser from "phaser";
-import { COLORS, FONT_FAMILY, GAME_HEIGHT, GAME_WIDTH, SCENES, TEX } from "../constants";
+import { COLORS, FONT_FAMILY, GAME_HEIGHT, GAME_WIDTH, LOGICAL_SCALE, SCENES, TEX } from "../constants";
 import { audio } from "../systems/AudioSystem";
+import { addGlassPanel, addSceneBackdrop } from "../ui/SceneChrome";
 
 export class HowToPlayScene extends Phaser.Scene {
   constructor() {
@@ -8,8 +9,8 @@ export class HowToPlayScene extends Phaser.Scene {
   }
 
   create(): void {
-    const bg = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, COLORS.bgDeep);
-    bg.setAlpha(1);
+    addSceneBackdrop(this, "purple");
+    addGlassPanel(this, GAME_WIDTH / 2, GAME_HEIGHT / 2 + 6, 780, 440, COLORS.neonCyan, 0.78);
 
     const title = this.add.text(GAME_WIDTH / 2, 60, "HOW TO PLAY", {
       fontFamily: FONT_FAMILY,
@@ -61,8 +62,9 @@ export class HowToPlayScene extends Phaser.Scene {
     const rowH = 78;
     sections.forEach((sec, i) => {
       const y = baseY + i * rowH;
-      const card = this.add.rectangle(GAME_WIDTH / 2, y, 720, rowH - 10, 0x121542, 0.65);
+      const card = this.add.rectangle(GAME_WIDTH / 2, y, 720, rowH - 10, 0x10173a, 0.72);
       card.setStrokeStyle(1.5, parseInt(sec.color.replace("#", "0x"), 16), 0.6);
+      this.add.rectangle(GAME_WIDTH / 2 - 348, y, 4, rowH - 22, parseInt(sec.color.replace("#", "0x"), 16), 0.8);
 
       const tag = this.add.text(GAME_WIDTH / 2 - 320, y, sec.icon, {
         fontFamily: FONT_FAMILY,
@@ -98,7 +100,7 @@ export class HowToPlayScene extends Phaser.Scene {
     enemies.forEach((e, i) => {
       const x = GAME_WIDTH / 2 - 180 + i * 120;
       const img = this.add.image(x, enemyY, e.tex);
-      img.setScale(1.6);
+      img.setScale(1.9 * LOGICAL_SCALE);
       const lbl = this.add.text(x, enemyY + 28, e.name, {
         fontFamily: FONT_FAMILY,
         fontSize: "12px",

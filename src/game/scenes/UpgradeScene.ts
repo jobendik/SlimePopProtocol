@@ -3,6 +3,7 @@ import { COLORS, FONT_FAMILY, GAME_HEIGHT, GAME_WIDTH, SCENES } from "../constan
 import type { UpgradeDef } from "../data/upgrades";
 import { audio } from "../systems/AudioSystem";
 import { CrazyGamesAdapter } from "../systems/CrazyGamesAdapter";
+import { addGlassPanel } from "../ui/SceneChrome";
 
 export type UpgradeSceneData = {
   choices: UpgradeDef[];
@@ -29,8 +30,9 @@ export class UpgradeScene extends Phaser.Scene {
     // ad-friendly: this is a safe moment between rounds
     CrazyGamesAdapter.requestMidgameAd();
 
-    const overlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x06061a, 0.85);
+    const overlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x06061a, 0.84);
     overlay.setInteractive();
+    addGlassPanel(this, GAME_WIDTH / 2, GAME_HEIGHT / 2 + 18, 820, 420, COLORS.neonCyan, 0.72);
 
     const title = this.add.text(GAME_WIDTH / 2, 80, "INSTALL UPGRADE MODULE", {
       fontFamily: FONT_FAMILY,
@@ -81,9 +83,11 @@ export class UpgradeScene extends Phaser.Scene {
     def: UpgradeDef,
     hotkey: number
   ): void {
-    const card = this.add.rectangle(x, y, w, h, 0x121542, 0.95);
-    card.setStrokeStyle(2, def.color, 0.8);
+    const card = this.add.rectangle(x, y, w, h, 0x10173a, 0.92);
+    card.setStrokeStyle(2, def.color, 0.88);
     card.setInteractive({ useHandCursor: true });
+    const shine = this.add.rectangle(x, y - h / 2 + 18, w - 28, 4, def.color, 0.55);
+    const scan = this.add.rectangle(x, y + h / 2 - 20, w - 34, 2, def.color, 0.24);
 
     const hot = this.add.text(x - w / 2 + 12, y - h / 2 + 10, `${hotkey}`, {
       fontFamily: FONT_FAMILY,
@@ -119,13 +123,17 @@ export class UpgradeScene extends Phaser.Scene {
 
     card.on("pointerover", () => {
       card.setStrokeStyle(3, COLORS.neonPink, 1);
+      shine.setFillStyle(COLORS.neonPink, 0.85);
+      scan.setFillStyle(COLORS.neonPink, 0.35);
       this.tweens.add({ targets: card, scale: 1.04, duration: 140 });
-      this.tweens.add({ targets: [icon, name, desc, hot], scale: 1.04, duration: 140 });
+      this.tweens.add({ targets: [shine, scan, icon, name, desc, hot], scale: 1.04, duration: 140 });
     });
     card.on("pointerout", () => {
       card.setStrokeStyle(2, def.color, 0.8);
+      shine.setFillStyle(def.color, 0.55);
+      scan.setFillStyle(def.color, 0.24);
       this.tweens.add({ targets: card, scale: 1, duration: 140 });
-      this.tweens.add({ targets: [icon, name, desc, hot], scale: 1, duration: 140 });
+      this.tweens.add({ targets: [shine, scan, icon, name, desc, hot], scale: 1, duration: 140 });
     });
     card.on("pointerdown", () => {
       audio.upgradeSelected();

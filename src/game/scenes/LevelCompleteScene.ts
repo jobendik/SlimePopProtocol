@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import { COLORS, FONT_FAMILY, GAME_HEIGHT, GAME_WIDTH, SCENES } from "../constants";
 import { audio } from "../systems/AudioSystem";
 import type { SaveSystem } from "../systems/SaveSystem";
+import { addChromeButton, addGlassPanel } from "../ui/SceneChrome";
 import { formatScore } from "../utils/math";
 
 export type LevelCompleteData = {
@@ -30,17 +31,18 @@ export class LevelCompleteScene extends Phaser.Scene {
       scrap: 0,
     });
 
-    const overlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x06061a, 0.85);
+    const overlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x06061a, 0.84);
     overlay.setInteractive();
 
-    const card = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, 520, 320, 0x121542, 0.95);
-    card.setStrokeStyle(2, COLORS.neonCyan, 1);
+    addGlassPanel(this, GAME_WIDTH / 2, GAME_HEIGHT / 2, 540, 328, COLORS.neonGold, 0.9);
 
     const headline = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 110, `LEVEL ${data.levelNumber} CLEAR`, {
       fontFamily: FONT_FAMILY,
       fontStyle: "900",
       fontSize: "30px",
       color: "#ffd166",
+      stroke: "#06061a",
+      strokeThickness: 5,
     });
     headline.setOrigin(0.5);
 
@@ -79,18 +81,7 @@ export class LevelCompleteScene extends Phaser.Scene {
       val.setOrigin(1, 0.5);
     });
 
-    const button = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 110, 220, 38, 0x1c4a2a, 0.9);
-    button.setStrokeStyle(2, COLORS.neonGreen, 1);
-    button.setInteractive({ useHandCursor: true });
-    const buttonLabel = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 110, "CONTINUE", {
-      fontFamily: FONT_FAMILY,
-      fontStyle: "900",
-      fontSize: "16px",
-      color: "#e7f6ff",
-    });
-    buttonLabel.setOrigin(0.5);
-
-    button.on("pointerdown", () => this.advance(data));
+    addChromeButton(this, GAME_WIDTH / 2, GAME_HEIGHT / 2 + 110, 230, 40, "CONTINUE", COLORS.neonGreen, () => this.advance(data));
     this.input.keyboard?.once("keydown-ENTER", () => this.advance(data));
     this.input.keyboard?.once("keydown-SPACE", () => this.advance(data));
   }

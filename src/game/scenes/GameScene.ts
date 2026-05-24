@@ -6,7 +6,6 @@ import {
   FIELD,
   GAME_HEIGHT,
   GAME_WIDTH,
-  PLAYER,
   SCENES,
   SCORE,
   TEX,
@@ -155,9 +154,6 @@ export class GameScene extends Phaser.Scene {
 
     this.physics.add.collider(this.player, platforms);
     this.physics.add.collider(this.slimeGroup, platforms);
-    this.physics.add.collider(this.fields, platforms, (obj1, obj2) => {
-      this.onFieldHitPlatform(obj1 as ContainmentField, obj2);
-    });
     this.physics.add.collider(this.pickups, platforms);
 
     // Player vs slime — only "alive" slimes deal damage
@@ -292,7 +288,7 @@ export class GameScene extends Phaser.Scene {
 
     if (this.player.alive) {
       const intent = this.player.update(time, delta, input);
-      if (intent.wantShoot) this.fireField(time);
+      if (intent.wantShoot) this.fireField();
     }
 
     this.tutorial?.update(time, {
@@ -366,14 +362,15 @@ export class GameScene extends Phaser.Scene {
   // Game actions
   // ──────────────────────────────────────────────────────────────────────────
 
-  private fireField(time: number): void {
+  private fireField(): void {
     if (this.fields.countActive() >= FIELD.maxActive) return;
     const mods = this.upgrades.modifiers();
     const facing = this.player.facing;
-    const sx = this.player.x + facing * FIELD.spawnOffsetX;
-    const sy = this.player.y + FIELD.spawnOffsetY;
+    const muzzleDistance = this.player.displayWidth / 2 + mods.fieldRadius + 2;
+    const sx = this.player.x + facing * muzzleDistance;
+    const sy = this.player.body.bottom - mods.fieldRadius - 1;
     const field = new ContainmentField(this, sx, sy, mods.fieldRadius, mods.pierce);
-    field.launch(FIELD.speed * facing, -30);
+    field.launch(FIELD.speed * facing, 0);
     this.fields.add(field);
     audio.shoot();
     this.effects.burst(sx, sy, { color: COLORS.neonCyan, count: 4, spread: 60, lifespan: 220 });
@@ -397,14 +394,6 @@ export class GameScene extends Phaser.Scene {
     if (!this.trappedFirstSlime) {
       this.trappedFirstSlime = true;
       this.tutorial?.onFirstTrap(field);
-    }
-  }
-
-  private onFieldHitPlatform(field: ContainmentField, _platform: unknown): void {
-    if (field.state !== "flying") return;
-    // bounce gently
-    if (Math.abs(field.body.velocity.x) < 40 && Math.abs(field.body.velocity.y) < 40) {
-      // it's basically stopped — let it expire normally
     }
   }
 
