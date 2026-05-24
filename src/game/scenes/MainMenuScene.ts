@@ -6,6 +6,7 @@ import {
   GAME_TITLE,
   GAME_VERSION,
   GAME_WIDTH,
+  LOGICAL_SCALE,
   SCENES,
   TEX,
 } from "../constants";
@@ -58,7 +59,7 @@ export class MainMenuScene extends Phaser.Scene {
     const floor = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT - 26, GAME_WIDTH, 60, 0x121542);
     floor.setStrokeStyle(2, COLORS.neonCyan, 1);
 
-    // floating sparks
+    // floating sparks — particle texture baked at TEX_SUPERSAMPLE× density.
     for (let i = 0; i < 18; i++) {
       const dot = this.add.image(
         Phaser.Math.Between(0, GAME_WIDTH),
@@ -67,7 +68,7 @@ export class MainMenuScene extends Phaser.Scene {
       );
       dot.setTint(i % 3 === 0 ? COLORS.neonPink : COLORS.neonCyan);
       dot.setAlpha(0.5);
-      dot.setScale(0.4 + Math.random() * 0.6);
+      dot.setScale((0.4 + Math.random() * 0.6) * LOGICAL_SCALE);
       this.tweens.add({
         targets: dot,
         y: dot.y - 40 - Math.random() * 80,
@@ -151,9 +152,10 @@ export class MainMenuScene extends Phaser.Scene {
   private buildHeroPreview(): void {
     const heroX = GAME_WIDTH * 0.78;
     const heroY = GAME_HEIGHT * 0.55;
-
+    // All textures baked at TEX_SUPERSAMPLE× density — every scale is multiplied
+    // by LOGICAL_SCALE so the on-screen size matches the original design.
     const bot = this.add.image(heroX, heroY, TEX.player);
-    bot.setScale(2.4);
+    bot.setScale(2.4 * LOGICAL_SCALE);
 
     this.tweens.add({
       targets: bot,
@@ -165,11 +167,11 @@ export class MainMenuScene extends Phaser.Scene {
     });
 
     const slime = this.add.image(heroX - 50, heroY + 30, TEX.slimeBasic);
-    slime.setScale(1.6);
+    slime.setScale(1.6 * LOGICAL_SCALE);
     this.tweens.add({
       targets: slime,
-      scaleX: 1.7,
-      scaleY: 1.5,
+      scaleX: 1.7 * LOGICAL_SCALE,
+      scaleY: 1.5 * LOGICAL_SCALE,
       duration: 600,
       yoyo: true,
       repeat: -1,
@@ -177,11 +179,11 @@ export class MainMenuScene extends Phaser.Scene {
     });
 
     const field = this.add.image(heroX - 24, heroY - 30, TEX.field);
-    field.setScale(1.6);
+    field.setScale(1.6 * LOGICAL_SCALE);
     field.setBlendMode(Phaser.BlendModes.ADD);
     this.tweens.add({
       targets: field,
-      scale: 1.85,
+      scale: 1.85 * LOGICAL_SCALE,
       alpha: 0.7,
       duration: 900,
       yoyo: true,

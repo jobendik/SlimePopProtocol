@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { DEPTH, TEX } from "../constants";
+import { DEPTH, LOGICAL_SCALE, TEX } from "../constants";
 
 /**
  * Tiny scrap (yellow) or battery (cyan) collectible.  Hops once on spawn,
@@ -26,6 +26,8 @@ export class ScrapPickup extends Phaser.Physics.Arcade.Image {
     this.scrapValue = value;
     scene.add.existing(this);
     scene.physics.add.existing(this);
+    // Texture baked at TEX_SUPERSAMPLE× density.
+    this.setScale(LOGICAL_SCALE);
     this.body.setCircle(7, 0, 0);
     this.body.setBounce(0.5);
     this.body.setDragX(120);

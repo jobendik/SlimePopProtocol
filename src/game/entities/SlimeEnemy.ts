@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { DEPTH, ENEMY, TEX } from "../constants";
+import { DEPTH, ENEMY, LOGICAL_SCALE, TEX } from "../constants";
 import type { ContainmentField } from "./ContainmentField";
 
 export type SlimeKind = "basic" | "bouncer" | "charger" | "shield";
@@ -27,9 +27,21 @@ export abstract class SlimeEnemy extends Phaser.Physics.Arcade.Sprite {
     scene.add.existing(this);
     scene.physics.add.existing(this);
     this.setDepth(DEPTH.enemy);
+    // Textures are baked at TEX_SUPERSAMPLE× pixel density.
+    this.setScale(LOGICAL_SCALE);
     this.setCollideWorldBounds(true);
     this.body.setBounce(0, 0);
-    this.body.setSize(this.width - 4, this.height - 4);
+    // Arcade bodies are sized in source pixels and then multiplied by scale.
+    // The intended body is the displayed slime minus a small forgiving inset.
+    const bodyWidth = (this.displayWidth - 4) / LOGICAL_SCALE;
+    const bodyHeight = (this.displayHeight - 4) / LOGICAL_SCALE;
+    this.body.setSize(bodyWidth, bodyHeight);
+    // Center horizontally and bottom-align vertically so visual slime bottoms
+    // rest on platforms instead of sinking into them.
+    this.body.setOffset(
+      (this.width - bodyWidth) / 2,
+      this.height - bodyHeight
+    );
     this.bornAt = scene.time.now;
     this.direction = Math.random() < 0.5 ? -1 : 1;
   }
@@ -38,11 +50,13 @@ export abstract class SlimeEnemy extends Phaser.Physics.Arcade.Sprite {
   abstract aiTick(time: number, delta: number): void;
 
   override update(time: number, delta: number): void {
+    // All setScale calls multiply by LOGICAL_SCALE so the texture supersample
+    // doesn't get clobbered back to 1× by the squash/stretch animation.
     if (this.state !== "alive") {
       // While trapped, ContainmentField positions us; just wobble visually
       this.setScale(
-        1 + Math.sin(time * 0.018) * 0.06,
-        1 - Math.sin(time * 0.018) * 0.06
+        (1 + Math.sin(time * 0.018) * 0.06) * LOGICAL_SCALE,
+        (1 - Math.sin(time * 0.018) * 0.06) * LOGICAL_SCALE
       );
       return;
     }
@@ -52,12 +66,15 @@ export abstract class SlimeEnemy extends Phaser.Physics.Arcade.Sprite {
     const vy = this.body.velocity.y;
     if (onGround) {
       this.setScale(
-        1 + Math.sin(time * 0.012) * 0.04,
-        1 - Math.sin(time * 0.012) * 0.04
+        (1 + Math.sin(time * 0.012) * 0.04) * LOGICAL_SCALE,
+        (1 - Math.sin(time * 0.012) * 0.04) * LOGICAL_SCALE
       );
     } else {
       const stretch = Phaser.Math.Clamp(vy / 600, -1, 1);
-      this.setScale(1 - stretch * 0.12, 1 + stretch * 0.12);
+      this.setScale(
+        (1 - stretch * 0.12) * LOGICAL_SCALE,
+        (1 + stretch * 0.12) * LOGICAL_SCALE
+      );
     }
 
     // Turn-at-ledge / wall logic — overridable

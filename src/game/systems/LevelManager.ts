@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { COLORS, DEPTH, GAME_HEIGHT, GAME_WIDTH, TEX } from "../constants";
+import { COLORS, DEPTH, GAME_HEIGHT, GAME_WIDTH, LOGICAL_SCALE, TEX } from "../constants";
 import { LEVELS, LEVEL_COUNT, type LevelData } from "../data/levels";
 import { BossSlime } from "../entities/BossSlime";
 import { Portal } from "../entities/Portal";
@@ -106,7 +106,8 @@ export class LevelManager {
       );
       dot.setTint(palette.accent);
       dot.setAlpha(0.3);
-      dot.setScale(0.4);
+      // Particle texture baked at TEX_SUPERSAMPLE× density.
+      dot.setScale(0.4 * LOGICAL_SCALE);
       dot.setDepth(DEPTH.bgNear);
       scene.tweens.add({
         targets: dot,
@@ -124,12 +125,16 @@ export class LevelManager {
     scene: Phaser.Scene,
     platforms: Phaser.Physics.Arcade.StaticGroup
   ): void {
-    // Floor — invisible, but with a visible neon strip on top
+    // Floor — fills from y=(GAME_HEIGHT-32) to the screen bottom.
+    // The physics body top is at GAME_HEIGHT-32; draw the neon strip as a
+    // filled rectangle starting exactly there so entities land flush with it.
     const floor = scene.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT - 16, GAME_WIDTH, 32, COLORS.platformBase);
     scene.physics.add.existing(floor, true);
-    floor.setStrokeStyle(2, COLORS.platformEdge, 1);
     floor.setDepth(DEPTH.platform);
     platforms.add(floor);
+    // Neon top-edge strip: 2 px tall, top aligned with body.top = GAME_HEIGHT-32.
+    const floorEdge = scene.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT - 31, GAME_WIDTH, 2, COLORS.platformEdge);
+    floorEdge.setDepth(DEPTH.platform + 0.1);
 
     // Side walls — keep player + slimes on screen
     const leftWall = scene.add.rectangle(-12, GAME_HEIGHT / 2, 24, GAME_HEIGHT, COLORS.bgDeep, 0);

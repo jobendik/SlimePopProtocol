@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { COLORS, DEPTH, FONT_FAMILY, GAME_WIDTH, PLAYER, TEX } from "../constants";
+import { COLORS, DEPTH, FONT_FAMILY, GAME_WIDTH, LOGICAL_SCALE, PLAYER, TEX } from "../constants";
 import { formatScore } from "../utils/math";
 
 /**
@@ -27,10 +27,11 @@ export class Hud {
     panel.fillRoundedRect(8, 8, 240, 38, 8);
     panel.setDepth(DEPTH.hud);
 
-    // Hearts
+    // Hearts — textures baked at TEX_SUPERSAMPLE× density.
     for (let i = 0; i < PLAYER.maxHearts; i++) {
       const h = scene.add.image(28 + i * 22, 27, TEX.heart);
       h.setDepth(DEPTH.hud + 1);
+      h.setScale(LOGICAL_SCALE);
       this.hearts.push(h);
     }
 
@@ -61,6 +62,7 @@ export class Hud {
 
     this.scrapIcon = scene.add.image(GAME_WIDTH - 220, 33, TEX.scrap);
     this.scrapIcon.setDepth(DEPTH.hud + 1);
+    this.scrapIcon.setScale(LOGICAL_SCALE);
     this.scrapLabel = scene.add.text(GAME_WIDTH - 208, 33, "0", {
       fontFamily: FONT_FAMILY,
       fontStyle: "bold",
@@ -158,7 +160,7 @@ export class Hud {
     if (active && !this.shieldIcon) {
       this.shieldIcon = this.scene.add.image(160, 26, TEX.particle);
       this.shieldIcon.setTint(0xcfe9ff);
-      this.shieldIcon.setScale(1.2);
+      this.shieldIcon.setScale(1.2 * LOGICAL_SCALE);
       this.shieldIcon.setDepth(DEPTH.hud + 1);
     } else if (!active && this.shieldIcon) {
       this.shieldIcon.destroy();

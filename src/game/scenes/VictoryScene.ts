@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { COLORS, FONT_FAMILY, GAME_HEIGHT, GAME_WIDTH, SCENES, TEX } from "../constants";
+import { COLORS, FONT_FAMILY, GAME_HEIGHT, GAME_WIDTH, LOGICAL_SCALE, SCENES, TEX } from "../constants";
 import { audio } from "../systems/AudioSystem";
 import { CrazyGamesAdapter } from "../systems/CrazyGamesAdapter";
 import type { SaveSystem } from "../systems/SaveSystem";
@@ -33,7 +33,8 @@ export class VictoryScene extends Phaser.Scene {
       const y = Phaser.Math.Between(-40, GAME_HEIGHT);
       const p = this.add.image(x, y, TEX.star);
       p.setTint(Phaser.Utils.Array.GetRandom([COLORS.neonCyan, COLORS.neonPink, COLORS.neonGold, COLORS.neonGreen]));
-      p.setScale(0.5 + Math.random());
+      // Star texture baked at TEX_SUPERSAMPLE× density.
+      p.setScale((0.5 + Math.random()) * LOGICAL_SCALE);
       this.tweens.add({
         targets: p,
         y: y + GAME_HEIGHT + 60,

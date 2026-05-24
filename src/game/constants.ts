@@ -12,6 +12,19 @@ export const GAME_VERSION = "0.1.0";
 export const GAME_WIDTH = 960;
 export const GAME_HEIGHT = 540;
 
+/**
+ * Procedural textures are generated at this multiple of their logical size,
+ * then every sprite consumer applies `setScale(LOGICAL_SCALE)` so positions,
+ * physics bodies and level data stay in 960x540 world units while textures
+ * carry 4× the pixel data — much crisper when the canvas is upscaled by the
+ * browser to fit large iframes / fullscreen.
+ *
+ * Trade-off: 4× texture memory.  Negligible here (a few dozen tiny textures,
+ * largest is the 80×80 portal → 160×160 = 26 KB even at RGBA).
+ */
+export const TEX_SUPERSAMPLE = 2;
+export const LOGICAL_SCALE = 1 / TEX_SUPERSAMPLE;
+
 /** Centralised colour palette so every scene/system stays on-brand. */
 export const COLORS = {
   bgDeep: 0x06061a,

@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { COLORS, DEPTH, TEX } from "../constants";
+import { COLORS, DEPTH, LOGICAL_SCALE, TEX } from "../constants";
 
 /**
  * Level exit.  Spawns dormant; `activate()` opens it once all slimes are
@@ -19,10 +19,16 @@ export class Portal extends Phaser.Physics.Arcade.Image {
     scene.physics.add.existing(this);
     this.body.setAllowGravity(false);
     this.body.setImmovable(true);
-    this.body.setCircle(32, 8, 8);
+    // Body offset is in texture coords (same Phaser quirk as Player/Boss),
+    // so scale up the old 8-px offset by 1/LOGICAL_SCALE to stay centred on
+    // the supersampled texture.
+    this.body.setCircle(32, 8 / LOGICAL_SCALE, 8 / LOGICAL_SCALE);
     this.setDepth(DEPTH.portal);
     this.setAlpha(0.25);
-    this.setScale(0.65);
+    // Texture baked at TEX_SUPERSAMPLE× density.  The portal animates from
+    // dim/small (0.65) to full (1.0) — all multiplied by LOGICAL_SCALE so
+    // displayed size stays in world units.
+    this.setScale(0.65 * LOGICAL_SCALE);
     this.timeBorn = scene.time.now;
   }
 
@@ -32,7 +38,7 @@ export class Portal extends Phaser.Physics.Arcade.Image {
     this.scene.tweens.add({
       targets: this,
       alpha: 1,
-      scale: 1,
+      scale: LOGICAL_SCALE,
       duration: 360,
       ease: "Back.easeOut",
     });
@@ -68,7 +74,7 @@ export class Portal extends Phaser.Physics.Arcade.Image {
     this.orbitRing = this.scene.add.image(this.x, this.y, TEX.shockwave);
     this.orbitRing.setTint(COLORS.portalSecondary);
     this.orbitRing.setAlpha(0.4);
-    this.orbitRing.setScale(2.6);
+    this.orbitRing.setScale(2.6 * LOGICAL_SCALE);
     this.orbitRing.setDepth(DEPTH.portal - 1);
     this.orbitRing.setBlendMode(Phaser.BlendModes.ADD);
     this.scene.tweens.add({

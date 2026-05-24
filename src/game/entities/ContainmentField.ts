@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { COLORS, DEPTH, FIELD, TEX } from "../constants";
+import { COLORS, DEPTH, FIELD, LOGICAL_SCALE, TEX } from "../constants";
 import type { SlimeEnemy } from "./SlimeEnemy";
 
 /**
@@ -35,7 +35,9 @@ export class ContainmentField extends Phaser.Physics.Arcade.Image {
     this.body.setCircle(24, 0, 0);
     this.body.setAllowGravity(false);
     this.body.setBounce(FIELD.bounceDamping);
-    this.setScale(radius / 24);
+    // Texture is baked at TEX_SUPERSAMPLE× pixel density — fold LOGICAL_SCALE
+    // into the radius-based scale so the displayed size matches world units.
+    this.setScale((radius / 24) * LOGICAL_SCALE);
     this.timeBornForFlight = scene.time.now;
     this.spawnedAt = this.timeBornForFlight;
     this.expiresAt = this.timeBornForFlight + FIELD.emptyLifetimeMs;
@@ -66,10 +68,11 @@ export class ContainmentField extends Phaser.Physics.Arcade.Image {
   override update(time: number, _delta: number): void {
     if (this.state === "popping") return;
 
-    // wobble pulse
+    // wobble pulse — baseScale folds in LOGICAL_SCALE so the supersample
+    // texture displays at world-radius dimensions.
     this.pulsePhase += 0.12;
     const pulse = 1 + Math.sin(this.pulsePhase) * 0.06;
-    const baseScale = this.radius / 24;
+    const baseScale = (this.radius / 24) * LOGICAL_SCALE;
     this.setScale(baseScale * pulse, baseScale * (2 - pulse));
 
     if (this.state === "flying") {

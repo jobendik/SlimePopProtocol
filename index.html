@@ -35,8 +35,11 @@
       #game-root canvas {
         display: block;
         margin: 0 auto;
-        image-rendering: pixelated;
-        image-rendering: crisp-edges;
+        /* The game's procedural art is smooth (gradients, circles, rounded
+         * rects) — NOT pixel art. Force the browser to smooth-scale instead
+         * of nearest-neighbour-scale, which previously made everything look
+         * blocky on any display larger than the 960x540 logical resolution. */
+        image-rendering: auto;
       }
       #boot-overlay {
         position: absolute;

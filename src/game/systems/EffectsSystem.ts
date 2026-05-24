@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { COLORS, DEPTH, TEX } from "../constants";
+import { COLORS, DEPTH, LOGICAL_SCALE, TEX } from "../constants";
 
 /**
  * Reusable visual effects — particles, ring shockwaves, screen shake, floaty
@@ -45,14 +45,17 @@ export class EffectsSystem {
     const color = opts.color ?? COLORS.neonCyan;
     const duration = opts.duration ?? 320;
 
+    // Shockwave texture is baked at TEX_SUPERSAMPLE× density — both the start
+    // scale and the radius-based target scale are multiplied by LOGICAL_SCALE
+    // so the visible ring expands to the same world radius as before.
     const ring = this.scene.add.image(x, y, TEX.shockwave);
     ring.setDepth(DEPTH.effect);
     ring.setTint(color);
     ring.setAlpha(0.9);
-    ring.setScale(0.2);
+    ring.setScale(0.2 * LOGICAL_SCALE);
     this.scene.tweens.add({
       targets: ring,
-      scale: radius / 32,
+      scale: (radius / 32) * LOGICAL_SCALE,
       alpha: 0,
       duration,
       ease: "Cubic.easeOut",
@@ -74,7 +77,8 @@ export class EffectsSystem {
       const p = this.scene.add.image(x, y, tex);
       p.setDepth(DEPTH.effect);
       p.setTint(color);
-      p.setScale(0.4 + Math.random() * 0.8);
+      // Particle textures baked at TEX_SUPERSAMPLE× — scale down to world units.
+      p.setScale((0.4 + Math.random() * 0.8) * LOGICAL_SCALE);
       p.setAlpha(0.95);
       const vx = Math.cos(angle) * speed;
       const vy = Math.sin(angle) * speed;

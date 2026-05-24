@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { COLORS, DEPTH, PLAYER, TEX } from "../constants";
+import { COLORS, DEPTH, LOGICAL_SCALE, PLAYER, TEX } from "../constants";
 import type { ActionState } from "../systems/InputSystem";
 import type { RunModifiers } from "../systems/UpgradeSystem";
 
@@ -35,8 +35,19 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     scene.physics.add.existing(this);
     this.setDepth(DEPTH.player);
     this.setOrigin(0.5, 0.5);
-    this.setSize(PLAYER.width, PLAYER.height);
-    this.setOffset((this.width - PLAYER.width) / 2, (this.height - PLAYER.height) / 2);
+    // Textures are baked at TEX_SUPERSAMPLE× pixel density — scale down here
+    // so world coords, body sizes and level data stay in logical pixels.
+    this.setScale(LOGICAL_SCALE);
+    const bodyWidth = PLAYER.width / LOGICAL_SCALE;
+    const bodyHeight = PLAYER.height / LOGICAL_SCALE;
+    this.setSize(bodyWidth, bodyHeight);
+    // Arcade bodies are sized in source pixels and then multiplied by scale.
+    // Keep the collision box 22x28 in world pixels, centered horizontally and
+    // bottom-aligned so the visual feet sit on the platform top.
+    this.setOffset(
+      (this.width - bodyWidth) / 2,
+      this.height - bodyHeight
+    );
     this.setCollideWorldBounds(true);
     this.body.setMaxVelocity(380, PLAYER.maxFallSpeed);
     this.body.setDragX(PLAYER.drag);
@@ -100,14 +111,15 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     }
     this.isJumpHeld = input.jumpHeld;
 
-    // Squash/stretch
+    // Squash/stretch — multiply by LOGICAL_SCALE so the supersample texture
+    // doesn't snap back to 1× during the animation.
     if (!onGround) {
       const v = Phaser.Math.Clamp(this.body.velocity.y / 600, -1, 1);
-      this.setScale(1 - v * 0.12, 1 + v * 0.12);
+      this.setScale((1 - v * 0.12) * LOGICAL_SCALE, (1 + v * 0.12) * LOGICAL_SCALE);
     } else {
       this.setScale(
-        Phaser.Math.Linear(this.scaleX, 1, 0.2),
-        Phaser.Math.Linear(this.scaleY, 1, 0.2)
+        Phaser.Math.Linear(this.scaleX, LOGICAL_SCALE, 0.2),
+        Phaser.Math.Linear(this.scaleY, LOGICAL_SCALE, 0.2)
       );
     }
 
@@ -155,7 +167,11 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       this.thruster.setVisible(true);
       this.thruster.x = this.x;
       this.thruster.y = this.y + 14;
-      this.thruster.setScale(0.6 + Math.random() * 0.4, 1.0 + Math.random() * 0.5);
+      // Particle texture baked at TEX_SUPERSAMPLE× density.
+      this.thruster.setScale(
+        (0.6 + Math.random() * 0.4) * LOGICAL_SCALE,
+        (1.0 + Math.random() * 0.5) * LOGICAL_SCALE
+      );
       this.thruster.setAlpha(0.7 + Math.random() * 0.3);
     } else if (this.thruster) {
       this.thruster.setVisible(false);

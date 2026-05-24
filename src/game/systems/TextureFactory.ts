@@ -1,11 +1,35 @@
 import Phaser from "phaser";
-import { COLORS, TEX } from "../constants";
+import { COLORS, TEX, TEX_SUPERSAMPLE } from "../constants";
 
 /**
  * Generates every in-game texture procedurally so the build stays tiny and
  * 100% original.  Run once during the Preload scene.
+ *
+ * Every texture is rendered at TEX_SUPERSAMPLE× its logical pixel size so that
+ * sprites stay crisp when the canvas is upscaled to fit large displays.  The
+ * `bake()` helper scales the Graphics object before snapshotting it to a
+ * texture so individual draw methods can stay readable in their logical sizes.
+ *
+ * Consumers must apply `setScale(LOGICAL_SCALE)` (or multiply existing scales
+ * by it) so the displayed size matches the world coordinates.
  */
 export class TextureFactory {
+  /**
+   * Renders the graphics object to a texture at TEX_SUPERSAMPLE× pixel density.
+   * The graphics object is destroyed after.
+   */
+  private static bake(
+    g: Phaser.GameObjects.Graphics,
+    key: string,
+    w: number,
+    h: number
+  ): void {
+    const s = TEX_SUPERSAMPLE;
+    g.setScale(s, s);
+    g.generateTexture(key, Math.ceil(w * s), Math.ceil(h * s));
+    g.destroy();
+  }
+
   static buildAll(scene: Phaser.Scene): void {
     TextureFactory.buildPlayer(scene);
     TextureFactory.buildPlayerShoot(scene);
@@ -65,8 +89,7 @@ export class TextureFactory {
     g.fillStyle(COLORS.neonCyan, 1);
     g.fillCircle(W / 2, H / 2 + 4, 2.4);
 
-    g.generateTexture(TEX.player, W, H);
-    g.destroy();
+    TextureFactory.bake(g, TEX.player, W, H);
   }
 
   private static buildPlayerShoot(scene: Phaser.Scene): void {
@@ -107,8 +130,7 @@ export class TextureFactory {
     g.fillStyle(COLORS.neonCyan, 1);
     g.fillCircle(W / 2, H / 2 + 4, 2.6);
 
-    g.generateTexture(TEX.playerShoot, W, H);
-    g.destroy();
+    TextureFactory.bake(g, TEX.playerShoot, W, H);
   }
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -181,8 +203,7 @@ export class TextureFactory {
         break;
     }
 
-    g.generateTexture(key, W, H);
-    g.destroy();
+    TextureFactory.bake(g, key, W, H);
   }
 
   private static buildSlimes(scene: Phaser.Scene): void {
@@ -244,8 +265,7 @@ export class TextureFactory {
       g.fillTriangle(x - 6, 16, x, 2, x + 6, 16);
     }
 
-    g.generateTexture(TEX.boss, W, H);
-    g.destroy();
+    TextureFactory.bake(g, TEX.boss, W, H);
   }
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -279,8 +299,7 @@ export class TextureFactory {
     g.fillCircle(r - 6, r - 6, 1.4);
     g.fillCircle(r + 4, r + 5, 1);
 
-    g.generateTexture(TEX.field, size, size);
-    g.destroy();
+    TextureFactory.bake(g, TEX.field, size, size);
 
     // larger, warmer texture for trapped state
     const g2 = scene.add.graphics({ x: 0, y: 0 });
@@ -296,8 +315,7 @@ export class TextureFactory {
     g2.strokeCircle(r, r, r - 4);
     g2.lineStyle(1, 0xffffff, 0.85);
     g2.strokeCircle(r, r, r - 6);
-    g2.generateTexture(TEX.fieldTrapped, size, size);
-    g2.destroy();
+    TextureFactory.bake(g2, TEX.fieldTrapped, size, size);
   }
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -340,8 +358,7 @@ export class TextureFactory {
     g.fillStyle(COLORS.platformShadow, 0.6);
     g.fillRect(2, h - 3, w - 4, 3);
 
-    g.generateTexture(key, w, h);
-    g.destroy();
+    TextureFactory.bake(g, key, w, h);
   }
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -366,8 +383,7 @@ export class TextureFactory {
     g.fillStyle(0xffffff, 0.7);
     g.fillCircle(r, r, r - 24);
 
-    g.generateTexture(TEX.portal, size, size);
-    g.destroy();
+    TextureFactory.bake(g, TEX.portal, size, size);
   }
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -382,16 +398,14 @@ export class TextureFactory {
     g.fillTriangle(size / 2, 0, size, size, 0, size);
     g.fillStyle(0xffffff, 0.6);
     g.fillTriangle(size / 2, 2, size / 2 + 3, size - 4, size / 2 - 3, size - 4);
-    g.generateTexture(TEX.scrap, size, size);
-    g.destroy();
+    TextureFactory.bake(g, TEX.scrap, size, size);
 
     const g2 = scene.add.graphics({ x: 0, y: 0 });
     g2.fillStyle(COLORS.battery, 1);
     g2.fillRoundedRect(0, 2, size, size - 4, 2);
     g2.fillStyle(0xffffff, 0.6);
     g2.fillRect(2, 3, size - 4, 2);
-    g2.generateTexture(TEX.battery, size, size);
-    g2.destroy();
+    TextureFactory.bake(g2, TEX.battery, size, size);
   }
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -406,8 +420,7 @@ export class TextureFactory {
       g.fillStyle(0xffffff, 0.16 * i);
       g.fillCircle(size / 2, size / 2, (size / 2) * (i / 6));
     }
-    g.generateTexture(TEX.particle, size, size);
-    g.destroy();
+    TextureFactory.bake(g, TEX.particle, size, size);
 
     // 4-point star particle
     const s = 14;
@@ -417,8 +430,7 @@ export class TextureFactory {
     g2.fillTriangle(s / 2, s, s / 2 + 2, s / 2, s / 2 - 2, s / 2);
     g2.fillTriangle(0, s / 2, s / 2, s / 2 - 2, s / 2, s / 2 + 2);
     g2.fillTriangle(s, s / 2, s / 2, s / 2 - 2, s / 2, s / 2 + 2);
-    g2.generateTexture(TEX.star, s, s);
-    g2.destroy();
+    TextureFactory.bake(g2, TEX.star, s, s);
 
     // shockwave ring (gets scaled at run-time)
     const sw = 64;
@@ -428,8 +440,7 @@ export class TextureFactory {
     g3.strokeCircle(r, r, r - 4);
     g3.lineStyle(2, COLORS.neonCyan, 1);
     g3.strokeCircle(r, r, r - 8);
-    g3.generateTexture(TEX.shockwave, sw, sw);
-    g3.destroy();
+    TextureFactory.bake(g3, TEX.shockwave, sw, sw);
   }
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -448,8 +459,7 @@ export class TextureFactory {
       g.fillTriangle(W / 2 - 10, 8, W / 2 + 10, 8, W / 2, H - 1);
       g.fillStyle(0xffffff, 0.4 * alpha);
       g.fillCircle(W / 2 - 5, 5, 2);
-      g.generateTexture(key, W, H);
-      g.destroy();
+      TextureFactory.bake(g, key, W, H);
     };
 
     drawHeart(COLORS.neonPink, 1, TEX.heart);

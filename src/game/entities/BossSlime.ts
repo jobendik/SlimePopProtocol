@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { BOSS, COLORS, DEPTH, TEX } from "../constants";
+import { BOSS, COLORS, DEPTH, LOGICAL_SCALE, TEX } from "../constants";
 
 /**
  * Mini-boss: the Slime Reactor Blob.  Floats over the arena, periodically
@@ -24,10 +24,19 @@ export class BossSlime extends Phaser.Physics.Arcade.Sprite {
     scene.add.existing(this);
     scene.physics.add.existing(this);
     this.setDepth(DEPTH.enemy + 1);
+    // Texture is baked at TEX_SUPERSAMPLE× pixel density — scale down for
+    // display while keeping the body in logical world units.
+    this.setScale(LOGICAL_SCALE);
     this.body.setAllowGravity(false);
     this.body.setImmovable(false);
     this.body.setSize(BOSS.width - 16, BOSS.height - 16);
-    this.body.setOffset(8, 8);
+    // Same Phaser quirk as Player: offset is in texture coords and gets
+    // multiplied by scaleX, so to keep the body centred on the displayed
+    // sprite we use `(textureSize - bodySize/scale) / 2`.
+    this.body.setOffset(
+      (this.width - (BOSS.width - 16) / LOGICAL_SCALE) / 2,
+      (this.height - (BOSS.height - 16) / LOGICAL_SCALE) / 2
+    );
     this.patrolMinX = patrolMinX;
     this.patrolMaxX = patrolMaxX;
     this.nextSpawnAt = scene.time.now + 1500;
