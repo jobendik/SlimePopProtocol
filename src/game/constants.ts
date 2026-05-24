@@ -58,7 +58,10 @@ export const PLAYER = {
   accel: 1700,
   drag: 1600,
   airDrag: 600,
-  jumpVelocity: -420,
+  // -580 → ~153 px max jump from a standing tap. Sized so the player can
+  // clear the floor → y=380 first-platform gap (137 px) found in most levels
+  // with ~16 px of margin. Bumping was preferable to re-authoring every level.
+  jumpVelocity: -580,
   maxFallSpeed: 720,
   gravity: 1100,
   coyoteMs: 110,

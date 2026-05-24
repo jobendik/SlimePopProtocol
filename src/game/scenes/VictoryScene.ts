@@ -16,6 +16,7 @@ export class VictoryScene extends Phaser.Scene {
   }
 
   create(data: VictoryData): void {
+    audio.stopMusic();
     audio.victory();
     CrazyGamesAdapter.happyTime();
     CrazyGamesAdapter.gameplayStop();

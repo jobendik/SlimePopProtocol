@@ -57,7 +57,17 @@ export class PreloadScene extends Phaser.Scene {
         drawBar(1);
         CrazyGamesAdapter.loadingStop();
         this.time.delayedCall(120, () => {
-          this.scene.start(SCENES.MainMenu);
+          // ?level=N (parsed in BootScene) takes the player straight into a
+          // fresh run at that level, skipping the main menu.
+          const startLevelIndex = this.registry.get("startLevelIndex");
+          if (typeof startLevelIndex === "number") {
+            this.scene.start(SCENES.Game, {
+              level: startLevelIndex,
+              freshRun: true,
+            });
+          } else {
+            this.scene.start(SCENES.MainMenu);
+          }
         });
         return;
       }

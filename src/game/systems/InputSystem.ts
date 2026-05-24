@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { touchInputState } from "../ui/TouchControls";
 
 export type ActionState = {
   left: boolean;
@@ -79,28 +80,47 @@ export class InputSystem {
     const w = this.wasd;
     const pad = this.gamepadPad;
     const stickX = pad?.leftStick.x ?? 0;
+    const touch = touchInputState;
+    // On touch devices the global pointer-down is just a finger landing on the
+    // joystick or a button — it must NOT also count as "shoot". Desktop and
+    // mouse-driven sessions still get pointer-down → shoot.
+    const pointerShoot = this.pointerDown && !touch.enabled;
 
-    const left = !!(cur.left?.isDown) || w.A.isDown || !!(pad?.left) || stickX < -0.3;
-    const right = !!(cur.right?.isDown) || w.D.isDown || !!(pad?.right) || stickX > 0.3;
-    const up = !!(cur.up?.isDown) || w.W.isDown || !!(pad?.up);
-    const down = !!(cur.down?.isDown) || w.S.isDown || !!(pad?.down);
+    const left =
+      !!cur.left?.isDown ||
+      w.A.isDown ||
+      !!pad?.left ||
+      stickX < -0.3 ||
+      (touch.enabled && touch.axisX < -0.3);
+    const right =
+      !!cur.right?.isDown ||
+      w.D.isDown ||
+      !!pad?.right ||
+      stickX > 0.3 ||
+      (touch.enabled && touch.axisX > 0.3);
+    const up = !!cur.up?.isDown || w.W.isDown || !!pad?.up;
+    const down = !!cur.down?.isDown || w.S.isDown || !!pad?.down;
 
     const jumpHeld =
       this.jumpKeys.some((k) => k.isDown) ||
       cur.up?.isDown === true ||
       w.W.isDown ||
-      !!(pad?.A);
+      !!pad?.A ||
+      (touch.enabled && touch.jumpHeld);
     const shootHeld =
       this.shootKeys.some((k) => k.isDown) ||
-      this.pointerDown ||
-      !!(pad?.X) ||
-      !!(pad?.R2);
+      pointerShoot ||
+      !!pad?.X ||
+      !!pad?.R2 ||
+      (touch.enabled && touch.shootHeld);
     // Phaser gamepad doesn't expose a typed "start" — fall back to button index 9.
     const padStart = pad ? !!pad.buttons[9]?.pressed : false;
     const pauseHeld = this.pauseKeys.some((k) => k.isDown) || padStart;
 
     const jumpPressed = jumpHeld && !this.prevJumpHeld;
-    const shootPressed = (shootHeld && !this.prevShootHeld) || this.pointerJustDown;
+    const shootPressed =
+      (shootHeld && !this.prevShootHeld) ||
+      (this.pointerJustDown && !touch.enabled);
     const pausePressed = pauseHeld && !this.prevPauseHeld;
 
     this.prevJumpHeld = jumpHeld;

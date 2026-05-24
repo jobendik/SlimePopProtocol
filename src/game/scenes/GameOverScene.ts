@@ -17,6 +17,7 @@ export class GameOverScene extends Phaser.Scene {
   }
 
   create(data: GameOverData): void {
+    audio.stopMusic();
     audio.gameOver();
     CrazyGamesAdapter.gameplayStop();
     CrazyGamesAdapter.requestMidgameAd();

@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { SCENES } from "../constants";
 import { Hud } from "../ui/Hud";
+import { isTouchDevice, TouchControls } from "../ui/TouchControls";
 import { findUpgrade } from "../data/upgrades";
 import type { UpgradeStacks } from "../systems/UpgradeSystem";
 
@@ -26,6 +27,7 @@ export type HudUpdatePayload = Partial<HudInitState> & {
  */
 export class HudScene extends Phaser.Scene {
   private hud!: Hud;
+  private touchControls?: TouchControls;
 
   constructor() {
     super(SCENES.Hud);
@@ -37,6 +39,15 @@ export class HudScene extends Phaser.Scene {
     this.hud.setLevel(data.level, data.totalLevels);
     this.hud.setScore(data.score);
     this.hud.setScrap(data.scrap);
+
+    if (isTouchDevice()) {
+      this.touchControls = new TouchControls(this);
+    }
+
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.touchControls?.destroy();
+      this.touchControls = undefined;
+    });
 
     const gameScene = this.scene.get(SCENES.Game);
     gameScene.events.on("hud:update", (payload: HudUpdatePayload) => {

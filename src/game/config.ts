@@ -50,7 +50,8 @@ export function createGameConfig(): Phaser.Types.Core.GameConfig {
     },
     input: {
       gamepad: true,
-      activePointers: 2,
+      // Joystick + jump + shoot need three simultaneous touches; bump to 4 for safety.
+      activePointers: 4,
     },
     audio: {
       disableWebAudio: false,

@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { COLORS, FONT_FAMILY, GAME_HEIGHT, GAME_WIDTH, SCENES } from "../constants";
 import { audio } from "../systems/AudioSystem";
+import type { SaveSystem } from "../systems/SaveSystem";
 import { formatScore } from "../utils/math";
 
 export type LevelCompleteData = {
@@ -18,6 +19,17 @@ export class LevelCompleteScene extends Phaser.Scene {
   }
 
   create(data: LevelCompleteData): void {
+    // Track per-level progress so bestLevel / bestScore reflect mid-run state
+    // (a player who clears level 5 then quits should still show 5 in the menu).
+    // We pass scrap: 0 because GameOver/Victory will add the run's full scrap
+    // total once — sending it here too would double-count.
+    const save = this.registry.get("save") as SaveSystem | undefined;
+    save?.recordRun({
+      level: data.levelNumber,
+      score: data.score,
+      scrap: 0,
+    });
+
     const overlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x06061a, 0.85);
     overlay.setInteractive();
 

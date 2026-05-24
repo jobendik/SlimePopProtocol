@@ -86,23 +86,48 @@ export class OptionsScene extends Phaser.Scene {
       { onLabel: "NORMAL", offLabel: "LOW" });
     y += 60;
 
-    // Reset save
-    const resetBtn = this.add.rectangle(GAME_WIDTH / 2, y + 10, 220, 36, 0x4a1c2a, 0.85);
+    // Reset save — two-tap confirmation to avoid accidental wipes.
+    const RESET_IDLE_LABEL = "RESET SAVE DATA";
+    const RESET_CONFIRM_LABEL = "TAP AGAIN TO CONFIRM";
+    const CONFIRM_WINDOW_MS = 4000;
+
+    const resetBtn = this.add.rectangle(GAME_WIDTH / 2, y + 10, 260, 36, 0x4a1c2a, 0.85);
     resetBtn.setStrokeStyle(2, COLORS.warning, 1);
     resetBtn.setInteractive({ useHandCursor: true });
-    const resetLbl = this.add.text(GAME_WIDTH / 2, y + 10, "RESET SAVE DATA", {
+    const resetLbl = this.add.text(GAME_WIDTH / 2, y + 10, RESET_IDLE_LABEL, {
       fontFamily: FONT_FAMILY,
       fontStyle: "bold",
       fontSize: "14px",
       color: "#ff5577",
     });
     resetLbl.setOrigin(0.5);
+
+    let confirmArmedUntil = 0;
+    let armTimer: Phaser.Time.TimerEvent | undefined;
+    const disarm = (): void => {
+      confirmArmedUntil = 0;
+      resetLbl.setText(RESET_IDLE_LABEL);
+      resetBtn.setFillStyle(0x4a1c2a, 0.85);
+      armTimer?.remove();
+      armTimer = undefined;
+    };
+
     resetBtn.on("pointerdown", () => {
       audio.uiClick();
-      this.save.reset();
-      audio.setSettings(this.save.settings);
-      this.sliders.forEach((s) => this.drawSlider(s, s.get()));
-      this.toggles.forEach((t) => this.drawToggle(t));
+      const now = this.time.now;
+      if (now < confirmArmedUntil) {
+        disarm();
+        this.save.reset();
+        audio.setSettings(this.save.settings);
+        this.sliders.forEach((s) => this.drawSlider(s, s.get()));
+        this.toggles.forEach((t) => this.drawToggle(t));
+        return;
+      }
+      confirmArmedUntil = now + CONFIRM_WINDOW_MS;
+      resetLbl.setText(RESET_CONFIRM_LABEL);
+      resetBtn.setFillStyle(0x7a2244, 0.95);
+      armTimer?.remove();
+      armTimer = this.time.delayedCall(CONFIRM_WINDOW_MS, disarm);
     });
 
     const hint = this.add.text(

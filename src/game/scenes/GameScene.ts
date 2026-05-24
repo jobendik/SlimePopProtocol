@@ -30,6 +30,7 @@ import { EffectsSystem } from "../systems/EffectsSystem";
 import { InputSystem } from "../systems/InputSystem";
 import { LevelManager, type LevelBuild } from "../systems/LevelManager";
 import type { SaveSystem } from "../systems/SaveSystem";
+import { Tutorial } from "../systems/Tutorial";
 import { UpgradeSystem } from "../systems/UpgradeSystem";
 import { distSq } from "../utils/math";
 
@@ -65,6 +66,13 @@ export class GameScene extends Phaser.Scene {
   private allClearedShown = false;
   private boss: BossSlime | null = null;
   private transitioning = false;
+  private lastIntensityTarget = -1;
+  private nextIntensityCheckAt = 0;
+  private tutorial: Tutorial | null = null;
+  /** True once the player has taken their first non-absorbed hit this run.
+   *  Used to grant a one-time extra invulnerability window so a fluky early
+   *  hit doesn't snowball into a 4-second death. Persists across levels. */
+  private firstHitForgivenessUsed = false;
 
   constructor() {
     super(SCENES.Game);
@@ -84,6 +92,7 @@ export class GameScene extends Phaser.Scene {
       this.scrap = 0;
       this.combo.reset();
       this.upgrades.reset();
+      this.firstHitForgivenessUsed = false;
     } else {
       // Keep accumulated values; combo always resets between levels though
       this.combo.reset();
@@ -121,11 +130,19 @@ export class GameScene extends Phaser.Scene {
     this.setupHud();
     this.bindEvents();
 
-    if (this.build.level.hint) {
+    if (this.build.level.id === 1) {
+      // Level 1 runs the action-anchored tutorial instead of the static HUD
+      // hint so prompts follow the player and disappear as actions complete.
+      this.tutorial = new Tutorial(this, this.player);
+    } else if (this.build.level.hint) {
       this.events.emit("hud:update", { hintText: this.build.level.hint });
     }
 
     CrazyGamesAdapter.gameplayStart();
+    audio.startMusic();
+    audio.setMusicIntensity(0);
+    this.lastIntensityTarget = 0;
+    this.nextIntensityCheckAt = 0;
     this.cameras.main.fadeIn(220);
   }
 
@@ -243,6 +260,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private shutdownScene(): void {
+    this.tutorial?.destroy();
+    this.tutorial = null;
     this.tweens.killAll();
     this.time.removeAllEvents();
     // Only strip our own custom events — calling removeAllListeners() here
@@ -276,6 +295,13 @@ export class GameScene extends Phaser.Scene {
       if (intent.wantShoot) this.fireField(time);
     }
 
+    this.tutorial?.update(time, {
+      left: input.left,
+      right: input.right,
+      jumpPressed: input.jumpPressed,
+      shootPressed: input.shootPressed,
+    });
+
     for (const slime of this.slimes) {
       if (slime.active) slime.update(time, delta);
     }
@@ -302,6 +328,17 @@ export class GameScene extends Phaser.Scene {
 
     this.combo.tick(time);
     this.events.emit("hud:update", { combo: this.combo.current });
+
+    if (time >= this.nextIntensityCheckAt) {
+      this.nextIntensityCheckAt = time + 350;
+      const aliveSlimes = this.slimes.filter((s) => s.active && s.state === "alive").length;
+      const bossAlive = !!this.boss?.alive;
+      const target = bossAlive ? 1 : aliveSlimes <= 2 && aliveSlimes > 0 ? 0.6 : 0;
+      if (target !== this.lastIntensityTarget) {
+        this.lastIntensityTarget = target;
+        audio.setMusicIntensity(target);
+      }
+    }
 
     // Has level been cleared?
     if (!this.allClearedShown && this.areAllSlimesCleared() && (!this.boss || !this.boss.alive)) {
@@ -359,11 +396,7 @@ export class GameScene extends Phaser.Scene {
     this.effects.burst(field.x, field.y, { color: COLORS.neonPink, count: 6, spread: 80, lifespan: 280 });
     if (!this.trappedFirstSlime) {
       this.trappedFirstSlime = true;
-      if (this.build.level.id === 1) {
-        this.events.emit("hud:update", {
-          hintText: "TOUCH OR SHOOT THE FIELD TO POP IT",
-        });
-      }
+      this.tutorial?.onFirstTrap(field);
     }
   }
 
@@ -559,6 +592,21 @@ export class GameScene extends Phaser.Scene {
     this.effects.flash(0xff5577, 90, 0.35);
     this.effects.shake(0.012, 140);
     this.events.emit("hud:update", { hearts: this.player.hearts });
+
+    if (!result.died && !this.firstHitForgivenessUsed) {
+      // Extend the player's invuln by 2s and flash a "STAY CLEAR" prompt.
+      // One-time per run — stops a fluky first hit from snowballing.
+      this.firstHitForgivenessUsed = true;
+      this.player.invulnerableUntil = Math.max(
+        this.player.invulnerableUntil,
+        time + 2000
+      );
+      this.events.emit("hud:update", { hintText: "STAY CLEAR — SHIELD BOOSTED" });
+      this.time.delayedCall(1800, () => {
+        this.events.emit("hud:update", { clearHint: true });
+      });
+    }
+
     if (result.died) this.handlePlayerDeath();
   }
 

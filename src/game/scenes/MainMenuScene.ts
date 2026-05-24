@@ -9,6 +9,7 @@ import {
   SCENES,
   TEX,
 } from "../constants";
+import { LEVEL_COUNT } from "../data/levels";
 import { audio } from "../systems/AudioSystem";
 import type { SaveSystem } from "../systems/SaveSystem";
 
@@ -28,6 +29,8 @@ export class MainMenuScene extends Phaser.Scene {
 
   create(): void {
     audio.attach(this);
+    audio.startMusic();
+    audio.setMusicIntensity(0);
 
     this.buildBackground();
     this.buildTitle();
@@ -35,6 +38,9 @@ export class MainMenuScene extends Phaser.Scene {
     this.buildHeroPreview();
     this.buildFooter();
     this.installKeyboard();
+    if (this.registry.get("debug") === true) {
+      this.buildDebugLevelGrid();
+    }
   }
 
   private buildBackground(): void {
@@ -257,5 +263,53 @@ export class MainMenuScene extends Phaser.Scene {
 
   private startGame(): void {
     this.scene.start(SCENES.Game, { level: 0, freshRun: true });
+  }
+
+  /**
+   * Dev-only quick-jump grid.  Rendered only when `?debug=1` is in the URL.
+   * Twelve numbered buttons that start a fresh run at the picked level — no
+   * need to grind through 1–11 when iterating on later levels.
+   */
+  private buildDebugLevelGrid(): void {
+    const cellSize = 32;
+    const gap = 4;
+    const totalWidth = LEVEL_COUNT * cellSize + (LEVEL_COUNT - 1) * gap;
+    const startX = (GAME_WIDTH - totalWidth) / 2 + cellSize / 2;
+    const y = GAME_HEIGHT - 70;
+
+    const label = this.add.text(GAME_WIDTH / 2, y - 26, "DEBUG: SKIP TO LEVEL", {
+      fontFamily: FONT_FAMILY,
+      fontStyle: "bold",
+      fontSize: "11px",
+      color: "#ff6cf2",
+      letterSpacing: 2,
+    } as Phaser.Types.GameObjects.Text.TextStyle);
+    label.setOrigin(0.5);
+
+    for (let i = 0; i < LEVEL_COUNT; i++) {
+      const x = startX + i * (cellSize + gap);
+      const cell = this.add.rectangle(x, y, cellSize, cellSize, 0x1c1144, 0.85);
+      cell.setStrokeStyle(1, COLORS.neonPink, 0.6);
+      cell.setInteractive({ useHandCursor: true });
+      const num = this.add.text(x, y, `${i + 1}`, {
+        fontFamily: FONT_FAMILY,
+        fontStyle: "900",
+        fontSize: "14px",
+        color: "#e7f6ff",
+      });
+      num.setOrigin(0.5);
+      cell.on("pointerover", () => {
+        cell.setStrokeStyle(2, COLORS.neonGold, 1);
+        num.setColor("#ffd166");
+      });
+      cell.on("pointerout", () => {
+        cell.setStrokeStyle(1, COLORS.neonPink, 0.6);
+        num.setColor("#e7f6ff");
+      });
+      cell.on("pointerdown", () => {
+        audio.uiClick();
+        this.scene.start(SCENES.Game, { level: i, freshRun: true });
+      });
+    }
   }
 }
