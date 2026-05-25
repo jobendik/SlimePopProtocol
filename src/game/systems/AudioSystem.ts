@@ -38,160 +38,134 @@ export class AudioSystem {
   }
 
   // ──────────────────────────────────────────────────────────────────────────
-  // Music layer — single procedural pad with an intensity-driven arp on top.
-  // Both layers share the existing musicBus so the user's volume slider works.
+  // Music layer — Bubble Hop Loop.mp3 played through a looping
+  // AudioBufferSourceNode.  Buffer is fetched + decoded lazily on first
+  // play and reused for the rest of the session.  setMusicIntensity stays
+  // as a smooth gain ramp so calm/intense gameplay still feel distinct.
   // ──────────────────────────────────────────────────────────────────────────
 
+  /** Public-relative URL the Bubble Hop Loop is served from (see public/audio/). */
+  private static readonly MUSIC_URL = "audio/bubble-hop-loop.mp3";
+  /** Calm-state music gain.  At full intensity we ramp to 1.0× this. */
+  private static readonly MUSIC_BASE_GAIN = 0.7;
+
+  private musicBuffer: AudioBuffer | null = null;
+  private musicLoading: Promise<AudioBuffer | null> | null = null;
   private music: {
-    padOscs: OscillatorNode[];
-    padGain: GainNode;
-    filter: BiquadFilterNode;
-    lfo: OscillatorNode;
-    lfoGain: GainNode;
-    arpGain: GainNode;
-    arpTimer: number;
-    arpStep: number;
-    arpFreqs: number[];
-    targetIntensity: number;
+    source: AudioBufferSourceNode;
+    gain: GainNode;
   } | null = null;
+  private musicShouldPlay = false;
+  private musicIntensity = 0;
 
   /**
-   * Start the music bed.  Idempotent — calling twice is safe.  Designed to be
-   * invoked from a scene's `create()` even before the user has interacted; if
-   * the audio context is still suspended, the scheduled oscillators stay quiet
-   * until `resume()` runs from the first input gesture.
+   * Lazily fetch + decode the music file.  Errors (404, decode failure)
+   * resolve to null and silently disable music rather than crashing the
+   * audio system.
+   */
+  private async loadMusicBuffer(): Promise<AudioBuffer | null> {
+    if (this.musicBuffer) return this.musicBuffer;
+    if (this.musicLoading) return this.musicLoading;
+    if (!this.ctx) return null;
+    const ctx = this.ctx;
+    this.musicLoading = (async () => {
+      try {
+        const res = await fetch(AudioSystem.MUSIC_URL);
+        if (!res.ok) {
+          console.warn(`[audio] music fetch ${res.status}`);
+          return null;
+        }
+        const arr = await res.arrayBuffer();
+        const buffer = await ctx.decodeAudioData(arr);
+        this.musicBuffer = buffer;
+        return buffer;
+      } catch (err) {
+        console.warn("[audio] music load failed", err);
+        return null;
+      } finally {
+        this.musicLoading = null;
+      }
+    })();
+    return this.musicLoading;
+  }
+
+  /**
+   * Start (or restart) the music bed.  Idempotent.  If the buffer hasn't
+   * loaded yet, schedules playback for once it does.
    */
   startMusic(): void {
     this.ensureContext();
     if (!this.ctx || !this.musicBus) return;
-    if (this.music) return;
+    this.musicShouldPlay = true;
+    if (this.music) return; // already playing
 
-    const ctx = this.ctx;
-    const now = ctx.currentTime;
-
-    const filter = ctx.createBiquadFilter();
-    filter.type = "lowpass";
-    filter.frequency.value = 620;
-    filter.Q.value = 0.9;
-    filter.connect(this.musicBus);
-
-    // Slow filter sweep keeps the pad from feeling static.
-    const lfo = ctx.createOscillator();
-    lfo.type = "sine";
-    lfo.frequency.value = 0.07;
-    const lfoGain = ctx.createGain();
-    lfoGain.gain.value = 280;
-    lfo.connect(lfoGain);
-    lfoGain.connect(filter.frequency);
-    lfo.start();
-
-    // Pad: A-minor 7 voicing across three detuned oscillators.
-    const padGain = ctx.createGain();
-    padGain.gain.setValueAtTime(0, now);
-    padGain.gain.linearRampToValueAtTime(0.55, now + 1.6);
-    padGain.connect(filter);
-
-    const padFreqs = [110, 164.81, 196.0]; // A2, E3, G3
-    const padOscs: OscillatorNode[] = padFreqs.map((f, i) => {
-      const osc = ctx.createOscillator();
-      osc.type = i % 2 === 0 ? "sawtooth" : "triangle";
-      osc.frequency.value = f;
-      osc.detune.value = (i - 1) * 6;
-      const oscGain = ctx.createGain();
-      oscGain.gain.value = 0.18 / padFreqs.length;
-      osc.connect(oscGain);
-      oscGain.connect(padGain);
-      osc.start();
-      return osc;
-    });
-
-    // Intensity layer — a separate gain.  Note blips are spawned on a fixed
-    // interval but only when intensity is above the noise floor, so the
-    // scheduler stays cheap during calm play.
-    const arpGain = ctx.createGain();
-    arpGain.gain.value = 0;
-    arpGain.connect(this.musicBus);
-
-    const arpFreqs = [
-      220, 329.63, 261.63, 392.0, 329.63, 523.25, 392.0, 329.63,
-    ]; // A minor arp riff
-    let arpStep = 0;
-    const arpTimer = window.setInterval(() => {
-      if (!this.music || !this.ctx) return;
-      if (this.music.targetIntensity < 0.05) return;
-      const c = this.ctx;
-      const t = c.currentTime;
-      const f = arpFreqs[arpStep % arpFreqs.length];
-      arpStep++;
-      const osc = c.createOscillator();
-      osc.type = "square";
-      osc.frequency.value = f;
-      const g = c.createGain();
-      g.gain.setValueAtTime(0, t);
-      g.gain.linearRampToValueAtTime(0.11, t + 0.008);
-      g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
-      osc.connect(g);
-      g.connect(arpGain);
-      osc.start(t);
-      osc.stop(t + 0.22);
-    }, 180);
-
-    this.music = {
-      padOscs,
-      padGain,
-      filter,
-      lfo,
-      lfoGain,
-      arpGain,
-      arpTimer,
-      arpStep,
-      arpFreqs,
-      targetIntensity: 0,
+    const startWithBuffer = (buffer: AudioBuffer): void => {
+      if (!this.ctx || !this.musicBus || !this.musicShouldPlay) return;
+      // If something started while we were waiting, leave it.
+      if (this.music) return;
+      const source = this.ctx.createBufferSource();
+      source.buffer = buffer;
+      source.loop = true;
+      const gain = this.ctx.createGain();
+      const now = this.ctx.currentTime;
+      const target = this.intensityToGain(this.musicIntensity);
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(target, now + 1.4);
+      source.connect(gain);
+      gain.connect(this.musicBus);
+      source.start();
+      this.music = { source, gain };
     };
+
+    if (this.musicBuffer) {
+      startWithBuffer(this.musicBuffer);
+      return;
+    }
+    void this.loadMusicBuffer().then((buffer) => {
+      if (!buffer) return;
+      startWithBuffer(buffer);
+    });
   }
 
-  /** Fade out and tear down the music bed. */
+  /** Fade the music out and tear down the source. */
   stopMusic(fadeMs = 450): void {
+    this.musicShouldPlay = false;
     if (!this.music || !this.ctx) return;
     const m = this.music;
-    this.music = null; // prevents the interval callback from firing more notes
+    this.music = null;
     const t = this.ctx.currentTime;
     const tail = fadeMs / 1000;
-    m.padGain.gain.cancelScheduledValues(t);
-    m.padGain.gain.linearRampToValueAtTime(0, t + tail);
-    m.arpGain.gain.cancelScheduledValues(t);
-    m.arpGain.gain.linearRampToValueAtTime(0, t + tail);
+    m.gain.gain.cancelScheduledValues(t);
+    m.gain.gain.linearRampToValueAtTime(0, t + tail);
     window.setTimeout(() => {
-      window.clearInterval(m.arpTimer);
-      m.padOscs.forEach((o) => {
-        try {
-          o.stop();
-        } catch {
-          /* already stopped */
-        }
-        o.disconnect();
-      });
       try {
-        m.lfo.stop();
+        m.source.stop();
       } catch {
-        /* */
+        /* already stopped */
       }
-      m.lfo.disconnect();
-      m.lfoGain.disconnect();
-      m.padGain.disconnect();
-      m.filter.disconnect();
-      m.arpGain.disconnect();
+      m.source.disconnect();
+      m.gain.disconnect();
     }, fadeMs + 60);
   }
 
-  /** 0..1 — 0 = pad only (calm), 1 = full arp layer (intense). Ramped smoothly. */
-  setMusicIntensity(t: number): void {
-    if (!this.music || !this.ctx) return;
+  /**
+   * Map 0..1 intensity to a multiplier on MUSIC_BASE_GAIN.  Calm gameplay
+   * sits at 0.6×, intense pushes to 1.1× so the mix feels more present
+   * during boss waves.
+   */
+  private intensityToGain(t: number): number {
     const clamped = Math.max(0, Math.min(1, t));
-    this.music.targetIntensity = clamped;
+    return AudioSystem.MUSIC_BASE_GAIN * (0.6 + clamped * 0.5);
+  }
+
+  /** 0..1 — smoothly ramps the music gain. */
+  setMusicIntensity(t: number): void {
+    this.musicIntensity = Math.max(0, Math.min(1, t));
+    if (!this.music || !this.ctx) return;
     const now = this.ctx.currentTime;
-    this.music.arpGain.gain.cancelScheduledValues(now);
-    this.music.arpGain.gain.linearRampToValueAtTime(clamped * 0.55, now + 0.7);
+    const target = this.intensityToGain(this.musicIntensity);
+    this.music.gain.gain.cancelScheduledValues(now);
+    this.music.gain.gain.linearRampToValueAtTime(target, now + 0.7);
   }
 
   private ensureContext(): void {

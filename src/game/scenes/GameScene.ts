@@ -3,6 +3,7 @@ import {
   COLORS,
   COMBO,
   DEPTH,
+  ENEMY,
   FIELD,
   GAME_HEIGHT,
   GAME_WIDTH,
@@ -116,6 +117,11 @@ export class GameScene extends Phaser.Scene {
     const mods = this.upgrades.modifiers();
     this.player = new Player(this, this.build.playerSpawn.x, this.build.playerSpawn.y, mods);
 
+    // Safety net for level data: if any slime spawned within the player's
+    // safe-distance bubble (a fluky early hit that ends the run before the
+    // player can move), push it away horizontally to a clear spot.
+    this.enforceSpawnClearance();
+
     this.fields = this.physics.add.group({ runChildUpdate: false });
     this.pickups = this.physics.add.group({ runChildUpdate: false });
     this.slimeGroup = this.physics.add.group({ runChildUpdate: false });
@@ -179,11 +185,62 @@ export class GameScene extends Phaser.Scene {
     });
 
     if (this.boss) {
-      // Boss collisions: player overlap = damage, fields can damage on pop
+      // Boss collisions: player overlap = damage, fields = damage + pop
       this.physics.add.overlap(this.player, this.boss, () => {
         this.handlePlayerHit();
       });
+
+      // Field-vs-boss: a flying or trapped containment field that touches
+      // the boss damages it.  Without this the boss is functionally
+      // immortal — flying fields just pass through it and the trap-then-
+      // pop-near-boss mechanic alone requires getting the boss inside the
+      // pop radius, which the player can't reliably achieve from any
+      // reachable platform.
+      //
+      // Boss is passed FIRST (single sprite) so Phaser's
+      // collideSpriteVsGroup helper preserves the callback arg order as
+      // (boss, field).  When the group is passed first, Phaser internally
+      // swaps so the callback receives (sprite, child) — which previously
+      // crashed with `field.isPoppable is not a function` because `f` was
+      // actually the boss.
+      this.physics.add.overlap(this.boss, this.fields, (_b, f) => {
+        // Belt-and-braces guard in case Phaser ever reverses the order
+        // again: pick whichever argument is the ContainmentField.
+        const candidate = (f instanceof ContainmentField ? f : _b) as unknown;
+        if (!(candidate instanceof ContainmentField)) return;
+        const field = candidate;
+        if (!field.active || field.state === "popping") return;
+        if (!field.isPoppable()) return;
+        // popField handles the chain bookkeeping, FX, and the existing
+        // proximity boss-damage check — and since the field is touching
+        // the boss, the proximity test is guaranteed to pass.
+        this.popField(field);
+      });
       // Boss does not collide with the floor (it floats)
+    }
+  }
+
+  /**
+   * Push any slimes within `ENEMY.spawnSafeDistance` of the player's spawn
+   * to a safe horizontal offset.  Saves the level data when an author drops
+   * an enemy on the spawn point and prevents the run-ending "hit before you
+   * can move" frustration the user reported.
+   */
+  private enforceSpawnClearance(): void {
+    const px = this.player.x;
+    const py = this.player.y;
+    const minDist = ENEMY.spawnSafeDistance;
+    const minDistSq = minDist * minDist;
+    for (const slime of this.slimes) {
+      const dx = slime.x - px;
+      const dy = slime.y - py;
+      if (dx * dx + dy * dy >= minDistSq) continue;
+      // Move the slime to whichever side has more room within the arena.
+      const leftRoom = px - 24;
+      const rightRoom = GAME_WIDTH - 24 - px;
+      const dir = rightRoom >= leftRoom ? 1 : -1;
+      slime.x = Phaser.Math.Clamp(px + dir * minDist, 32, GAME_WIDTH - 32);
+      slime.body.updateFromGameObject();
     }
   }
 

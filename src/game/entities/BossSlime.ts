@@ -1,5 +1,6 @@
 import Phaser from "phaser";
-import { BOSS, COLORS, DEPTH, LOGICAL_SCALE, TEX } from "../constants";
+import { BOSS, DEPTH, LOGICAL_SCALE, TEX } from "../constants";
+import { CssVisual } from "../systems/CssVisual";
 
 /**
  * Mini-boss: the Slime Reactor Blob.  Floats over the arena, periodically
@@ -14,7 +15,9 @@ export class BossSlime extends Phaser.Physics.Arcade.Sprite {
   public override state: "patrol" | "telegraph" | "stomp" | "hurt" = "patrol";
   private nextSpawnAt: number;
   private nextStateAt: number;
-  private hpBar?: Phaser.GameObjects.Graphics;
+  private visual: CssVisual;
+  private hpBarVisual: CssVisual;
+  private hpFillEl!: HTMLDivElement;
   private direction: 1 | -1 = 1;
   private patrolMinX: number;
   private patrolMaxX: number;
@@ -43,9 +46,29 @@ export class BossSlime extends Phaser.Physics.Arcade.Sprite {
     this.nextStateAt = scene.time.now + 3000;
     this.body.setVelocityX(80);
 
-    this.hpBar = scene.add.graphics();
-    this.hpBar.setDepth(DEPTH.hud - 1);
-    this.drawHpBar();
+    // CSS-rendered boss body
+    this.setVisible(false);
+    this.visual = new CssVisual(scene, "cv-boss", { depth: DEPTH.enemy + 1 });
+    this.visual.setHtml(`
+      <div class="boss-shadow"></div>
+      <div class="boss-vents">
+        <span></span><span></span><span></span><span></span><span></span>
+      </div>
+      <div class="boss-body"></div>
+      <div class="boss-core"></div>
+      <div class="boss-eyes"><span></span><span></span></div>
+    `);
+
+    // CSS-rendered HP bar pinned to top-centre (separate visual, not tied
+    // to the boss position).
+    this.hpBarVisual = new CssVisual(scene, "cv-bosshp", { depth: DEPTH.hud });
+    this.hpBarVisual.setHtml(`<div class="hp-track"><div class="hp-fill"></div></div>`);
+    this.hpFillEl = this.hpBarVisual.node.querySelector(".hp-fill") as HTMLDivElement;
+    // Pin the HP bar visually to top-centre by placing it at a fixed canvas
+    // position.  The Phaser DOM container scales/pans with the canvas so this
+    // stays anchored regardless of fit.
+    this.hpBarVisual.setPosition(scene.scale.width / 2, 56);
+    this.updateHpBar();
   }
 
   override update(time: number, _delta: number): void {
@@ -53,7 +76,10 @@ export class BossSlime extends Phaser.Physics.Arcade.Sprite {
 
     if (this.state === "patrol") {
       this.body.setVelocityX(60 * this.direction);
-      this.body.setVelocityY(Math.sin(time * 0.002) * 30);
+      // Tight hover — wider oscillation pushed the boss outside the
+      // field-flight altitude on the upper half of each cycle, making it
+      // un-hittable.  Keep some life in the motion but constrain it.
+      this.body.setVelocityY(Math.sin(time * 0.002) * 10);
       if (this.x < this.patrolMinX) this.direction = 1;
       if (this.x > this.patrolMaxX) this.direction = -1;
     }
@@ -66,10 +92,11 @@ export class BossSlime extends Phaser.Physics.Arcade.Sprite {
 
     if (this.state === "hurt" && time >= this.nextStateAt) {
       this.state = "patrol";
-      this.clearTint();
     }
 
-    this.drawHpBar();
+    this.visual.setState("state", this.state);
+    this.visual.follow(this, LOGICAL_SCALE);
+    this.updateHpBar();
   }
 
   takeDamage(amount = 1): boolean {
@@ -77,36 +104,27 @@ export class BossSlime extends Phaser.Physics.Arcade.Sprite {
     this.hp -= amount;
     this.state = "hurt";
     this.nextStateAt = this.scene.time.now + 500;
-    this.setTint(0xff5577);
     this.scene.cameras.main.shake(180, 0.01);
+    this.visual.setState("state", "hurt");
     if (this.hp <= 0) {
       this.alive = false;
-      this.hpBar?.clear();
+      this.hpBarVisual.setVisible(false);
       return true;
     }
     return false;
   }
 
-  private drawHpBar(): void {
-    if (!this.hpBar) return;
-    const g = this.hpBar;
-    g.clear();
-    const width = 240;
-    const x = (this.scene.cameras.main.width - width) / 2;
-    const y = 40;
-    g.fillStyle(0x06061a, 0.75);
-    g.fillRoundedRect(x - 4, y - 6, width + 8, 18, 4);
-    g.fillStyle(0x222b55, 1);
-    g.fillRoundedRect(x, y, width, 8, 3);
+  private updateHpBar(): void {
+    if (!this.hpFillEl) return;
     const ratio = Math.max(0, this.hp / BOSS.hp);
-    const col =
-      ratio > 0.5 ? COLORS.neonGreen : ratio > 0.25 ? COLORS.neonGold : COLORS.warning;
-    g.fillStyle(col, 1);
-    g.fillRoundedRect(x, y, width * ratio, 8, 3);
+    this.hpFillEl.style.width = `${ratio * 100}%`;
+    const tier = ratio > 0.5 ? "high" : ratio > 0.25 ? "mid" : "low";
+    this.hpBarVisual.setState("tier", tier);
   }
 
   destroyAll(): void {
-    this.hpBar?.destroy();
+    this.visual.destroy();
+    this.hpBarVisual.destroy();
     this.destroy();
   }
 }

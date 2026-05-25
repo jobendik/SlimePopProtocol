@@ -1,132 +1,107 @@
 import Phaser from "phaser";
-import {
-  COLORS,
-  DEPTH,
-  FONT_FAMILY,
-  GAME_HEIGHT,
-  GAME_WIDTH,
-  LOGICAL_SCALE,
-  TEX,
-} from "../constants";
+import { DEPTH, GAME_HEIGHT, GAME_WIDTH } from "../constants";
+import { CssVisual } from "../systems/CssVisual";
 
-type BackdropTone = "blue" | "purple" | "amber" | "danger" | "victory";
+export type SceneTone = "blue" | "purple" | "amber" | "danger" | "victory";
 
-type ChromeButton = {
-  bg: Phaser.GameObjects.Rectangle;
-  label: Phaser.GameObjects.Text;
-  edge: Phaser.GameObjects.Rectangle;
+export type ChromeButton = {
+  visual: CssVisual;
+  setSelected: (selected: boolean) => void;
+  setLabel: (text: string) => void;
+  destroy: () => void;
 };
 
-function tonePalette(tone: BackdropTone): { far: number; mid: number; accent: number; accent2: number } {
-  switch (tone) {
-    case "purple":
-      return { far: 0x0b0824, mid: 0x21174f, accent: COLORS.neonPink, accent2: COLORS.neonCyan };
-    case "amber":
-      return { far: 0x120c18, mid: 0x3a244b, accent: COLORS.neonOrange, accent2: COLORS.neonGold };
-    case "danger":
-      return { far: 0x150915, mid: 0x351433, accent: COLORS.warning, accent2: COLORS.neonPink };
-    case "victory":
-      return { far: 0x071618, mid: 0x113b3e, accent: COLORS.neonGold, accent2: COLORS.neonGreen };
-    case "blue":
-    default:
-      return { far: COLORS.bgDeep, mid: COLORS.bgFar, accent: COLORS.neonCyan, accent2: COLORS.neonPink };
-  }
+export type ChromeSlider = {
+  visual: CssVisual;
+  refresh: () => void;
+  destroy: () => void;
+};
+
+export type ChromeToggle = {
+  visual: CssVisual;
+  refresh: () => void;
+  destroy: () => void;
+};
+
+/**
+ * Add the full CSS scene backdrop (palette by tone) — replaces the old
+ * Phaser-graphics backdrop with a much richer DOM/CSS rendering.
+ */
+export function addSceneBackdrop(scene: Phaser.Scene, tone: SceneTone = "blue"): CssVisual {
+  const visual = new CssVisual(scene, "cv-scene-bg", {
+    depth: DEPTH.bgFar - 20,
+    pixelWidth: GAME_WIDTH,
+    pixelHeight: GAME_HEIGHT,
+  });
+  visual.node.setAttribute("data-tone", tone);
+
+  const motes = Array.from({ length: 24 }, () => {
+    const left = Math.random() * 100;
+    const top = 6 + Math.random() * 70;
+    const delay = (Math.random() * 7).toFixed(2);
+    const scale = (0.6 + Math.random() * 1.6).toFixed(2);
+    return `<span style="left:${left}%;top:${top}%;animation-delay:${delay}s;transform:scale(${scale})"></span>`;
+  }).join("");
+
+  visual.setHtml(`
+    <div class="scene-motes">${motes}</div>
+    <div class="scene-floor"></div>
+  `);
+  visual.setPosition(GAME_WIDTH / 2, GAME_HEIGHT / 2);
+
+  return visual;
 }
 
-export function addSceneBackdrop(scene: Phaser.Scene, tone: BackdropTone = "blue"): void {
-  const palette = tonePalette(tone);
-
-  const g = scene.add.graphics();
-  g.fillStyle(palette.far, 1);
-  g.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
-  g.fillStyle(palette.mid, 0.7);
-  g.fillCircle(GAME_WIDTH * 0.72, GAME_HEIGHT * 0.34, 340);
-  g.fillStyle(palette.accent, 0.08);
-  g.fillCircle(GAME_WIDTH * 0.22, GAME_HEIGHT * 0.72, 260);
-  g.fillStyle(palette.accent2, 0.06);
-  g.fillCircle(GAME_WIDTH * 0.86, GAME_HEIGHT * 0.84, 220);
-
-  g.lineStyle(1, 0xffffff, 0.04);
-  for (let x = 0; x <= GAME_WIDTH; x += 48) {
-    g.lineBetween(x, 0, x - 80, GAME_HEIGHT);
-  }
-  for (let y = 30; y < GAME_HEIGHT; y += 48) {
-    g.lineBetween(0, y, GAME_WIDTH, y + 22);
-  }
-
-  g.fillStyle(0x03040e, 0.45);
-  for (let i = 0; i < 7; i++) {
-    const x = 50 + i * 145;
-    g.fillRoundedRect(x, 38 + (i % 2) * 22, 22, GAME_HEIGHT - 90, 4);
-    g.fillRoundedRect(x - 14, 118 + (i % 3) * 48, 50, 10, 3);
-  }
-
-  g.fillStyle(0x0b1230, 0.85);
-  g.fillRect(0, GAME_HEIGHT - 86, GAME_WIDTH, 86);
-  g.fillStyle(palette.accent, 0.18);
-  g.fillRect(0, GAME_HEIGHT - 88, GAME_WIDTH, 3);
-  g.lineStyle(2, palette.accent2, 0.16);
-  for (let x = -40; x < GAME_WIDTH; x += 72) {
-    g.lineBetween(x, GAME_HEIGHT - 20, x + 42, GAME_HEIGHT - 66);
-  }
-  g.setDepth(DEPTH.bgFar - 20);
-
-  if (!scene.textures.exists(TEX.particle)) return;
-  for (let i = 0; i < 26; i++) {
-    const spark = scene.add.image(
-      Phaser.Math.Between(0, GAME_WIDTH),
-      Phaser.Math.Between(20, GAME_HEIGHT - 110),
-      TEX.particle
-    );
-    spark.setTint(i % 3 === 0 ? palette.accent2 : palette.accent);
-    spark.setAlpha(0.18 + Math.random() * 0.28);
-    spark.setScale((0.2 + Math.random() * 0.45) * LOGICAL_SCALE);
-    spark.setBlendMode(Phaser.BlendModes.ADD);
-    spark.setDepth(DEPTH.bgNear);
-    scene.tweens.add({
-      targets: spark,
-      y: spark.y - 22 - Math.random() * 42,
-      alpha: 0.05,
-      duration: 1800 + Math.random() * 2600,
-      yoyo: true,
-      repeat: -1,
-      delay: Math.random() * 1200,
-      ease: "Sine.easeInOut",
-    });
-  }
-}
-
+/**
+ * Add a glass panel centred at (x, y).  Returns the CssVisual so callers can
+ * destroy it if they need to.  Most callers just leave it for the scene
+ * shutdown to clean up.
+ */
 export function addGlassPanel(
   scene: Phaser.Scene,
   x: number,
   y: number,
   w: number,
   h: number,
-  accent: number = COLORS.neonCyan,
-  alpha: number = 0.9
-): Phaser.GameObjects.Graphics {
-  const g = scene.add.graphics();
-  const left = x - w / 2;
-  const top = y - h / 2;
-
-  g.fillStyle(0x000000, 0.28);
-  g.fillRoundedRect(left + 8, top + 10, w, h, 8);
-  g.fillStyle(0x090d24, alpha);
-  g.fillRoundedRect(left, top, w, h, 8);
-  g.fillStyle(0xffffff, 0.035);
-  g.fillRoundedRect(left + 4, top + 4, w - 8, Math.max(18, h * 0.38), 6);
-  g.lineStyle(2, accent, 0.86);
-  g.strokeRoundedRect(left, top, w, h, 8);
-  g.lineStyle(1, 0xffffff, 0.18);
-  g.strokeRoundedRect(left + 4, top + 4, w - 8, h - 8, 6);
-  g.fillStyle(accent, 0.75);
-  g.fillRect(left + 18, top, Math.min(140, w - 36), 3);
-  g.fillStyle(accent, 0.24);
-  g.fillRect(left + 18, top + h - 4, w - 36, 2);
-
-  return g;
+  accentHex = "#6ffcff"
+): CssVisual {
+  const visual = new CssVisual(scene, "cv-panel", {
+    depth: DEPTH.hud - 1,
+    pixelWidth: w,
+    pixelHeight: h,
+  });
+  visual.node.style.setProperty("--panel-accent", accentHex);
+  visual.setHtml(`<div class="panel-frame"></div>`);
+  visual.setPosition(x, y);
+  return visual;
 }
 
+/**
+ * Big stylised title (with optional subtitle).  Wrapper element is
+ * centred at (x, y).
+ */
+export function addSceneTitle(
+  scene: Phaser.Scene,
+  x: number,
+  y: number,
+  title: string,
+  subtitle?: string
+): CssVisual {
+  const visual = new CssVisual(scene, "cv-title", {
+    depth: DEPTH.hud,
+    pixelWidth: 720,
+    pixelHeight: subtitle ? 92 : 64,
+  });
+  const sub = subtitle ? `<div class="title-sub">${subtitle}</div>` : "";
+  visual.setHtml(`<div class="title-main">${title}</div>${sub}`);
+  visual.setPosition(x, y);
+  return visual;
+}
+
+/**
+ * Add a CSS-rendered button.  onClick fires on either the DOM click event
+ * (mouse / touch) or via `setSelected(true)` + scene-level Enter/Space.
+ */
 export function addChromeButton(
   scene: Phaser.Scene,
   x: number,
@@ -134,37 +109,249 @@ export function addChromeButton(
   w: number,
   h: number,
   label: string,
-  color: number,
-  onClick: () => void
+  accentHex: string,
+  onClick: () => void,
+  variant: "default" | "danger" = "default"
 ): ChromeButton {
-  const bg = scene.add.rectangle(x, y, w, h, 0x10173a, 0.92);
-  bg.setStrokeStyle(2, color, 0.85);
-  bg.setInteractive({ useHandCursor: true });
-
-  const edge = scene.add.rectangle(x, y + h / 2 - 3, w - 18, 3, color, 0.5);
-  const text = scene.add.text(x, y, label, {
-    fontFamily: FONT_FAMILY,
-    fontStyle: "900",
-    fontSize: "16px",
-    color: "#e7f6ff",
+  const visual = new CssVisual(scene, "cv-button", {
+    depth: DEPTH.hud,
+    pixelWidth: w,
+    pixelHeight: h,
   });
-  text.setOrigin(0.5);
+  visual.node.style.setProperty("--btn-color", accentHex);
+  // Build an rgba glow from the hex
+  const m = /^#?([0-9a-f]{6})$/i.exec(accentHex);
+  if (m) {
+    const r = parseInt(m[1].slice(0, 2), 16);
+    const g = parseInt(m[1].slice(2, 4), 16);
+    const b = parseInt(m[1].slice(4, 6), 16);
+    visual.node.style.setProperty("--btn-glow", `rgba(${r}, ${g}, ${b}, 0.35)`);
+  }
+  if (variant === "danger") visual.node.setAttribute("data-variant", "danger");
+  visual.setHtml(`
+    <div class="btn-shell">
+      <span class="btn-label">${label}</span>
+    </div>
+  `);
+  visual.setPosition(x, y);
 
-  bg.on("pointerover", () => {
-    bg.setFillStyle(0x17204d, 0.98);
-    bg.setStrokeStyle(3, COLORS.neonPink, 1);
-    edge.setFillStyle(COLORS.neonPink, 0.85);
-    text.setColor("#ffd166");
-    scene.tweens.add({ targets: [bg, edge, text], scaleX: 1.035, scaleY: 1.035, duration: 130 });
-  });
-  bg.on("pointerout", () => {
-    bg.setFillStyle(0x10173a, 0.92);
-    bg.setStrokeStyle(2, color, 0.85);
-    edge.setFillStyle(color, 0.5);
-    text.setColor("#e7f6ff");
-    scene.tweens.add({ targets: [bg, edge, text], scaleX: 1, scaleY: 1, duration: 130 });
-  });
-  bg.on("pointerdown", onClick);
+  const labelEl = visual.node.querySelector(".btn-label") as HTMLElement;
 
-  return { bg, label: text, edge };
+  const clickHandler = (ev: Event) => {
+    ev.preventDefault();
+    onClick();
+  };
+  visual.node.addEventListener("click", clickHandler);
+  visual.node.addEventListener("touchend", clickHandler);
+
+  const setSelected = (selected: boolean) => {
+    if (selected) visual.node.setAttribute("data-selected", "1");
+    else visual.node.removeAttribute("data-selected");
+  };
+
+  const setLabel = (text: string) => {
+    labelEl.textContent = text;
+  };
+
+  const destroy = () => {
+    visual.node.removeEventListener("click", clickHandler);
+    visual.node.removeEventListener("touchend", clickHandler);
+    visual.destroy();
+  };
+
+  return { visual, setSelected, setLabel, destroy };
+}
+
+/**
+ * Simple centred label row.
+ */
+export function addCssText(
+  scene: Phaser.Scene,
+  x: number,
+  y: number,
+  text: string,
+  opts: {
+    size?: number;
+    color?: string;
+    weight?: number | "bold" | "normal";
+    letterSpacing?: number;
+    align?: "center" | "left" | "right";
+    width?: number;
+  } = {}
+): CssVisual {
+  const visual = new CssVisual(scene, "cv-text", {
+    depth: DEPTH.hud,
+    pixelWidth: opts.width ?? 600,
+    pixelHeight: (opts.size ?? 14) + 6,
+  });
+  const el = document.createElement("div");
+  el.textContent = text;
+  el.style.fontSize = `${opts.size ?? 14}px`;
+  el.style.color = opts.color ?? "#e7f6ff";
+  el.style.fontWeight = String(opts.weight ?? 700);
+  el.style.letterSpacing = `${opts.letterSpacing ?? 2}px`;
+  el.style.textAlign = opts.align ?? "center";
+  el.style.whiteSpace = "nowrap";
+  el.style.width = "100%";
+  visual.node.querySelector(".cv-flip")!.appendChild(el);
+  visual.setPosition(x, y);
+  return visual;
+}
+
+/**
+ * Pulsing "Press X to continue" prompt.
+ */
+export function addCssHint(scene: Phaser.Scene, x: number, y: number, text: string): CssVisual {
+  const visual = new CssVisual(scene, "cv-hint-text", {
+    depth: DEPTH.hud,
+    pixelWidth: 600,
+    pixelHeight: 24,
+  });
+  const el = document.createElement("div");
+  el.textContent = text;
+  el.style.width = "100%";
+  visual.node.querySelector(".cv-flip")!.appendChild(el);
+  visual.setPosition(x, y);
+  return visual;
+}
+
+/**
+ * Bottom-of-screen footer (BEST LEVEL / BEST SCORE etc.)
+ */
+export function addCssFooter(scene: Phaser.Scene, html: string): CssVisual {
+  const visual = new CssVisual(scene, "cv-footer", {
+    depth: DEPTH.hud,
+    pixelWidth: GAME_WIDTH,
+    pixelHeight: 18,
+  });
+  const el = document.createElement("div");
+  el.innerHTML = html;
+  el.style.width = "100%";
+  visual.node.querySelector(".cv-flip")!.appendChild(el);
+  visual.setPosition(GAME_WIDTH / 2, GAME_HEIGHT - 24);
+  return visual;
+}
+
+/**
+ * Slider row centred at (x, y).  `get` / `set` are the value accessors —
+ * the slider just renders the percentage and forwards drag events.
+ */
+export function addCssSlider(
+  scene: Phaser.Scene,
+  x: number,
+  y: number,
+  width: number,
+  label: string,
+  get: () => number,
+  set: (v: number) => void
+): ChromeSlider {
+  const visual = new CssVisual(scene, "cv-slider", {
+    depth: DEPTH.hud,
+    pixelWidth: width,
+    pixelHeight: 30,
+  });
+  visual.setHtml(`
+    <div class="sl-label">${label}</div>
+    <div class="sl-track"><div class="sl-fill"></div></div>
+    <div class="sl-value">0</div>
+  `);
+  visual.setPosition(x, y);
+
+  const trackEl = visual.node.querySelector(".sl-track") as HTMLElement;
+  const fillEl = visual.node.querySelector(".sl-fill") as HTMLElement;
+  const valEl = visual.node.querySelector(".sl-value") as HTMLElement;
+
+  const refresh = () => {
+    const v = Phaser.Math.Clamp(get(), 0, 1);
+    fillEl.style.width = `${v * 100}%`;
+    valEl.textContent = `${Math.round(v * 100)}`;
+  };
+  refresh();
+
+  let dragging = false;
+  const apply = (clientX: number) => {
+    const rect = trackEl.getBoundingClientRect();
+    const v = Phaser.Math.Clamp((clientX - rect.left) / rect.width, 0, 1);
+    set(v);
+    refresh();
+  };
+  const onDown = (ev: PointerEvent) => {
+    dragging = true;
+    apply(ev.clientX);
+    trackEl.setPointerCapture(ev.pointerId);
+  };
+  const onMove = (ev: PointerEvent) => {
+    if (!dragging) return;
+    apply(ev.clientX);
+  };
+  const onUp = (ev: PointerEvent) => {
+    dragging = false;
+    if (trackEl.hasPointerCapture(ev.pointerId)) {
+      trackEl.releasePointerCapture(ev.pointerId);
+    }
+  };
+  trackEl.addEventListener("pointerdown", onDown);
+  trackEl.addEventListener("pointermove", onMove);
+  trackEl.addEventListener("pointerup", onUp);
+  trackEl.addEventListener("pointercancel", onUp);
+
+  const destroy = () => {
+    trackEl.removeEventListener("pointerdown", onDown);
+    trackEl.removeEventListener("pointermove", onMove);
+    trackEl.removeEventListener("pointerup", onUp);
+    trackEl.removeEventListener("pointercancel", onUp);
+    visual.destroy();
+  };
+
+  return { visual, refresh, destroy };
+}
+
+/**
+ * On/Off toggle row.
+ */
+export function addCssToggle(
+  scene: Phaser.Scene,
+  x: number,
+  y: number,
+  width: number,
+  label: string,
+  get: () => boolean,
+  set: (v: boolean) => void,
+  labels: { onLabel?: string; offLabel?: string } = {}
+): ChromeToggle {
+  const onLbl = labels.onLabel ?? "ON";
+  const offLbl = labels.offLabel ?? "OFF";
+
+  const visual = new CssVisual(scene, "cv-toggle", {
+    depth: DEPTH.hud,
+    pixelWidth: width,
+    pixelHeight: 30,
+  });
+  visual.setHtml(`
+    <div class="tg-label">${label}</div>
+    <div class="tg-pill">${get() ? onLbl : offLbl}</div>
+  `);
+  visual.setPosition(x, y);
+
+  const pillEl = visual.node.querySelector(".tg-pill") as HTMLElement;
+  const refresh = () => {
+    const v = get();
+    pillEl.textContent = v ? onLbl : offLbl;
+    if (v) visual.node.setAttribute("data-on", "1");
+    else visual.node.removeAttribute("data-on");
+  };
+  refresh();
+
+  const clickHandler = () => {
+    set(!get());
+    refresh();
+  };
+  pillEl.addEventListener("click", clickHandler);
+
+  const destroy = () => {
+    pillEl.removeEventListener("click", clickHandler);
+    visual.destroy();
+  };
+
+  return { visual, refresh, destroy };
 }

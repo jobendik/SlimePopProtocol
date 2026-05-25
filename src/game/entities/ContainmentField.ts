@@ -1,5 +1,6 @@
 import Phaser from "phaser";
-import { COLORS, DEPTH, FIELD, GAME_HEIGHT, LOGICAL_SCALE, TEX } from "../constants";
+import { DEPTH, FIELD, GAME_HEIGHT, LOGICAL_SCALE, TEX } from "../constants";
+import { CssVisual } from "../systems/CssVisual";
 import type { SlimeEnemy } from "./SlimeEnemy";
 
 /**
@@ -26,6 +27,7 @@ export class ContainmentField extends Phaser.Physics.Arcade.Image {
   private pulsePhase = 0;
   private flightVelocityX = 0;
   private flightVelocityY = 0;
+  private visual: CssVisual;
 
   constructor(scene: Phaser.Scene, x: number, y: number, radius: number, pierce: boolean) {
     super(scene, x, y, TEX.field);
@@ -48,6 +50,15 @@ export class ContainmentField extends Phaser.Physics.Arcade.Image {
     this.timeBornForFlight = scene.time.now;
     this.spawnedAt = this.timeBornForFlight;
     this.expiresAt = this.timeBornForFlight + FIELD.emptyLifetimeMs;
+
+    // Replace the procedural texture with a CSS-rendered DOM orb.  The
+    // sprite stays in the scene for physics and overlap detection only.
+    this.setVisible(false);
+    this.visual = new CssVisual(scene, "cv-field", { depth: DEPTH.field });
+    this.visual.setHtml(`
+      <div class="field-orb"></div>
+      <div class="field-glint"></div>
+    `);
   }
 
   launch(vx: number, vy: number): void {
@@ -64,7 +75,7 @@ export class ContainmentField extends Phaser.Physics.Arcade.Image {
     this.state = "trapped";
     this.trapped = slime;
     this.trapExpiresAt = time + trapDurationMs;
-    this.setTexture(TEX.fieldTrapped);
+    this.visual.setState("state", "trapped");
     this.body.setVelocity(0, 0);
     this.body.setAllowGravity(false);
     slime.onTrapped(this);
@@ -102,12 +113,8 @@ export class ContainmentField extends Phaser.Physics.Arcade.Image {
         this.fizzle();
         return;
       }
-      // mild colour shift as it ages
-      if (ageRatio > 0.66) {
-        this.setTint(0xfff7a0);
-      } else {
-        this.clearTint();
-      }
+      // mild colour shift as it ages — driven by data-attr (CSS handles look)
+      this.visual.setState("aging", ageRatio > 0.66 ? 1 : null);
     }
 
     if (this.state === "trapped" && this.trapped) {
@@ -122,19 +129,16 @@ export class ContainmentField extends Phaser.Physics.Arcade.Image {
       slime.body.setAllowGravity(false);
       slime.setRotation(Math.sin(this.pulsePhase) * 0.2);
 
-      // Warning flicker before escape
+      // Warning flicker before escape — drives a CSS animation via attr
       const remaining = this.trapExpiresAt - time;
-      if (remaining < FIELD.trapWarningMs) {
-        const flick = Math.floor(time / 80) % 2 === 0;
-        this.setAlpha(flick ? 1 : 0.55);
-      } else {
-        this.setAlpha(1);
-      }
+      this.visual.setState("warning", remaining < FIELD.trapWarningMs ? 1 : null);
 
       if (time >= this.trapExpiresAt) {
         this.releaseTrapped();
       }
     }
+
+    this.visual.follow(this, LOGICAL_SCALE);
   }
 
   private keepAboveFloor(): void {
@@ -185,26 +189,33 @@ export class ContainmentField extends Phaser.Physics.Arcade.Image {
     return false;
   }
 
-  /** Custom destroy — emit a tiny visual fade. */
+  /** Custom destroy — emit a tiny visual fade via a CSS ghost orb. */
   destroyWithFade(): void {
     if (!this.scene) {
       this.destroy();
       return;
     }
-    const x = this.x;
-    const y = this.y;
-    const ghost = this.scene.add.image(x, y, this.texture.key);
-    ghost.setDepth(DEPTH.field);
-    ghost.setScale(this.scaleX, this.scaleY);
-    ghost.setTint(COLORS.fieldRim);
-    ghost.setAlpha(0.5);
+    const ghost = new CssVisual(this.scene, "cv-field", { depth: DEPTH.field });
+    ghost.setHtml(`<div class="field-orb"></div><div class="field-glint"></div>`);
+    ghost.setPosition(this.x, this.y);
+    if (this.state === "trapped") ghost.setState("state", "trapped");
+    // Match host scale, then fade + expand.
+    const baseScale = this.scaleX / LOGICAL_SCALE;
+    ghost.dom.setScale(baseScale, baseScale);
+    ghost.dom.setAlpha(0.5);
     this.scene.tweens.add({
-      targets: ghost,
+      targets: ghost.dom,
       alpha: 0,
-      scale: this.scaleX * 1.4,
-      duration: 180,
+      scaleX: baseScale * 1.4,
+      scaleY: baseScale * 1.4,
+      duration: 220,
       onComplete: () => ghost.destroy(),
     });
     this.destroy();
+  }
+
+  override destroy(fromScene?: boolean): void {
+    this.visual?.destroy();
+    super.destroy(fromScene);
   }
 }

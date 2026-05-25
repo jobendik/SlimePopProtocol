@@ -42,7 +42,7 @@ export function createGameConfig(): Phaser.Types.Core.GameConfig {
       forceSetTimeOut: false,
     },
     dom: {
-      createContainer: false,
+      createContainer: true,
     },
     render: {
       powerPreference: "high-performance",

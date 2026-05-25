@@ -1,50 +1,72 @@
 import Phaser from "phaser";
-import { COLORS, FONT_FAMILY, GAME_HEIGHT, GAME_WIDTH, SCENES } from "../constants";
+import { DEPTH, GAME_HEIGHT, GAME_WIDTH, SCENES } from "../constants";
 import { audio } from "../systems/AudioSystem";
-import { addChromeButton, addGlassPanel } from "../ui/SceneChrome";
+import { CssVisual } from "../systems/CssVisual";
+import {
+  addChromeButton,
+  addCssHint,
+  addGlassPanel,
+  addSceneTitle,
+  type ChromeButton,
+} from "../ui/SceneChrome";
 
 export class PauseScene extends Phaser.Scene {
+  private buttons: ChromeButton[] = [];
+  private selectedIndex = 0;
+  private items: Array<{ label: string; action: () => void }> = [];
+
   constructor() {
     super(SCENES.Pause);
   }
 
   create(): void {
-    const overlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x06061a, 0.78);
-    overlay.setInteractive();
-    addGlassPanel(this, GAME_WIDTH / 2, GAME_HEIGHT / 2, 420, 270, COLORS.neonCyan, 0.88);
-
-    const title = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 80, "PAUSED", {
-      fontFamily: FONT_FAMILY,
-      fontStyle: "900",
-      fontSize: "48px",
-      color: "#6ffcff",
-      stroke: "#06061a",
-      strokeThickness: 5,
+    // Dim overlay — a full-bleed CssVisual that swallows pointer events
+    // so clicks fall onto buttons only, not the paused game underneath.
+    const overlay = new CssVisual(this, "cv-pause-dim", {
+      depth: DEPTH.hud - 2,
+      pixelWidth: GAME_WIDTH,
+      pixelHeight: GAME_HEIGHT,
     });
-    title.setOrigin(0.5);
+    overlay.node.style.background = "rgba(6, 6, 26, 0.78)";
+    overlay.node.style.pointerEvents = "auto";
+    overlay.setPosition(GAME_WIDTH / 2, GAME_HEIGHT / 2);
 
-    const items: Array<{ label: string; action: () => void }> = [
+    addGlassPanel(this, GAME_WIDTH / 2, GAME_HEIGHT / 2, 420, 280, "#6ffcff");
+    addSceneTitle(this, GAME_WIDTH / 2, GAME_HEIGHT / 2 - 78, "PAUSED");
+
+    this.items = [
       { label: "RESUME", action: () => this.close() },
       { label: "QUIT TO MENU", action: () => this.quitToMenu() },
     ];
 
-    items.forEach((it, idx) => {
-      const y = GAME_HEIGHT / 2 + idx * 50;
-      addChromeButton(this, GAME_WIDTH / 2, y, 240, 40, it.label, COLORS.neonCyan, () => {
+    this.items.forEach((it, idx) => {
+      const y = GAME_HEIGHT / 2 + 10 + idx * 60;
+      const btn = addChromeButton(this, GAME_WIDTH / 2, y, 260, 46, it.label, "#6ffcff", () => {
         audio.uiClick();
         it.action();
       });
+      btn.visual.node.addEventListener("pointerenter", () => this.select(idx));
+      this.buttons.push(btn);
     });
+    this.select(0);
 
-    const hint = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 40, "Press ESC or P to resume", {
-      fontFamily: FONT_FAMILY,
-      fontSize: "12px",
-      color: "#9bb0c8",
-    });
-    hint.setOrigin(0.5);
+    addCssHint(this, GAME_WIDTH / 2, GAME_HEIGHT - 38, "Press ESC or P to resume");
 
     this.input.keyboard?.once("keydown-ESC", () => this.close());
     this.input.keyboard?.once("keydown-P", () => this.close());
+    this.input.keyboard?.on("keydown-DOWN", () => this.select((this.selectedIndex + 1) % this.items.length));
+    this.input.keyboard?.on("keydown-UP",   () => this.select((this.selectedIndex - 1 + this.items.length) % this.items.length));
+    const confirm = () => {
+      audio.uiClick();
+      this.items[this.selectedIndex].action();
+    };
+    this.input.keyboard?.on("keydown-ENTER", confirm);
+    this.input.keyboard?.on("keydown-SPACE", confirm);
+  }
+
+  private select(i: number): void {
+    this.selectedIndex = i;
+    this.buttons.forEach((btn, idx) => btn.setSelected(idx === i));
   }
 
   private close(): void {

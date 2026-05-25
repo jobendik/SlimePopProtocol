@@ -72,7 +72,7 @@ export const LEVELS: readonly LevelData[] = [
     id: 3,
     name: "Lab Floor",
     hint: "Trap two slimes side by side, then pop one for a chain reaction.",
-    player: { x: 480, y: 420 },
+    player: { x: 120, y: 420 },
     exit: { x: 120, y: 220 },
     platforms: [
       { x: 240, y: 380, width: 96, style: "wide" },
@@ -162,7 +162,7 @@ export const LEVELS: readonly LevelData[] = [
     id: 7,
     name: "Charge Lane",
     hint: "Orange chargers telegraph before dashing. Use the platforms.",
-    player: { x: 480, y: 200 },
+    player: { x: 380, y: 200 },
     exit: { x: 880, y: 410 },
     platforms: [
       { x: 380, y: 230, width: 192, style: "wide" },
@@ -284,7 +284,7 @@ export const LEVELS: readonly LevelData[] = [
   {
     id: 12,
     name: "Reactor Core",
-    hint: "Pop containment fields near the Reactor Blob to damage it.",
+    hint: "Shoot containment fields at the Reactor Blob — each hit damages it.",
     player: { x: 480, y: 420 },
     exit: { x: 480, y: 50 },
     platforms: [
@@ -295,7 +295,10 @@ export const LEVELS: readonly LevelData[] = [
       { x: 384, y: 300, width: 192, style: "wide" },
     ],
     slimes: [],
-    boss: { x: 480, y: 130 },
+    // Boss patrols at y=200 so the player can shoot it from the y=220
+    // side platforms.  At y=130 it was floating above every reachable
+    // shooting position, leaving the player no way to land a hit.
+    boss: { x: 480, y: 200 },
     background: "lab-amber",
   },
 ];

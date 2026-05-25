@@ -1,5 +1,6 @@
 import Phaser from "phaser";
-import { COLORS, DEPTH, LOGICAL_SCALE, TEX } from "../constants";
+import { DEPTH, LOGICAL_SCALE, TEX } from "../constants";
+import { CssVisual } from "../systems/CssVisual";
 
 /**
  * Level exit.  Spawns dormant; `activate()` opens it once all slimes are
@@ -9,9 +10,8 @@ export class Portal extends Phaser.Physics.Arcade.Image {
   declare body: Phaser.Physics.Arcade.Body;
 
   public override active = false;
-  private hint?: Phaser.GameObjects.Text;
-  private orbitRing?: Phaser.GameObjects.Image;
   private timeBorn: number;
+  private visual: CssVisual;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super(scene, x, y, TEX.portal);
@@ -30,72 +30,39 @@ export class Portal extends Phaser.Physics.Arcade.Image {
     this.body.setAllowGravity(false);
     this.body.setImmovable(true);
     this.timeBorn = scene.time.now;
+
+    // CSS-rendered portal — the sprite stays in place for physics overlap.
+    this.setVisible(false);
+    this.visual = new CssVisual(scene, "cv-portal", { depth: DEPTH.portal });
+    this.visual.setHtml(`
+      <div class="portal-ring"></div>
+      <div class="portal-vortex"></div>
+      <div class="portal-core"></div>
+      <div class="portal-hint">ENTER</div>
+    `);
+    this.visual.setPosition(x, y);
   }
 
   activate(): void {
     if (this.active) return;
     this.active = true;
-    this.scene.tweens.add({
-      targets: this,
-      alpha: 1,
-      scale: LOGICAL_SCALE,
-      duration: 360,
-      ease: "Back.easeOut",
-    });
-    this.scene.tweens.add({
-      targets: this,
-      angle: 360,
-      duration: 4000,
-      repeat: -1,
-      ease: "Linear",
-    });
-
-    // Hint text
-    this.hint = this.scene.add.text(this.x, this.y - 60, "ENTER", {
-      fontFamily: "Segoe UI, sans-serif",
-      fontStyle: "bold",
-      fontSize: "14px",
-      color: "#ffd166",
-      stroke: "#06061a",
-      strokeThickness: 3,
-    });
-    this.hint.setOrigin(0.5);
-    this.hint.setDepth(DEPTH.portal);
-    this.scene.tweens.add({
-      targets: this.hint,
-      y: this.y - 70,
-      duration: 700,
-      yoyo: true,
-      repeat: -1,
-      ease: "Sine.easeInOut",
-    });
-
-    // Decorative orbit ring
-    this.orbitRing = this.scene.add.image(this.x, this.y, TEX.shockwave);
-    this.orbitRing.setTint(COLORS.portalSecondary);
-    this.orbitRing.setAlpha(0.4);
-    this.orbitRing.setScale(2.6 * LOGICAL_SCALE);
-    this.orbitRing.setDepth(DEPTH.portal - 1);
-    this.orbitRing.setBlendMode(Phaser.BlendModes.ADD);
-    this.scene.tweens.add({
-      targets: this.orbitRing,
-      angle: -360,
-      duration: 6000,
-      repeat: -1,
-      ease: "Linear",
-    });
+    this.visual.setState("active", 1);
+    this.setScale(LOGICAL_SCALE);
+    this.body.updateFromGameObject();
   }
 
   override update(time: number): void {
+    // Keep the CSS visual pinned to our world position.
+    this.visual.setPosition(this.x, this.y);
     if (!this.active) {
       // Idle dim flicker so the player can see where the portal *will* appear
-      this.setAlpha(0.18 + Math.sin((time - this.timeBorn) * 0.005) * 0.06);
+      const a = 0.18 + Math.sin((time - this.timeBorn) * 0.005) * 0.06;
+      this.visual.dom.setAlpha(a);
     }
   }
 
   destroyAll(): void {
-    this.hint?.destroy();
-    this.orbitRing?.destroy();
+    this.visual.destroy();
     this.destroy();
   }
 }

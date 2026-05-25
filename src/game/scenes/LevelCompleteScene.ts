@@ -1,8 +1,14 @@
 import Phaser from "phaser";
-import { COLORS, FONT_FAMILY, GAME_HEIGHT, GAME_WIDTH, SCENES } from "../constants";
+import { DEPTH, GAME_HEIGHT, GAME_WIDTH, SCENES } from "../constants";
 import { audio } from "../systems/AudioSystem";
+import { CssVisual } from "../systems/CssVisual";
 import type { SaveSystem } from "../systems/SaveSystem";
-import { addChromeButton, addGlassPanel } from "../ui/SceneChrome";
+import {
+  addChromeButton,
+  addCssText,
+  addGlassPanel,
+  addSceneTitle,
+} from "../ui/SceneChrome";
 import { formatScore } from "../utils/math";
 
 export type LevelCompleteData = {
@@ -20,70 +26,50 @@ export class LevelCompleteScene extends Phaser.Scene {
   }
 
   create(data: LevelCompleteData): void {
-    // Track per-level progress so bestLevel / bestScore reflect mid-run state
-    // (a player who clears level 5 then quits should still show 5 in the menu).
-    // We pass scrap: 0 because GameOver/Victory will add the run's full scrap
-    // total once — sending it here too would double-count.
     const save = this.registry.get("save") as SaveSystem | undefined;
-    save?.recordRun({
-      level: data.levelNumber,
-      score: data.score,
-      scrap: 0,
+    save?.recordRun({ level: data.levelNumber, score: data.score, scrap: 0 });
+
+    // Dim overlay
+    const overlay = new CssVisual(this, "cv-overlay-dim", {
+      depth: DEPTH.hud - 2,
+      pixelWidth: GAME_WIDTH,
+      pixelHeight: GAME_HEIGHT,
     });
+    overlay.node.style.background = "rgba(6, 6, 26, 0.82)";
+    overlay.node.style.pointerEvents = "auto";
+    overlay.setPosition(GAME_WIDTH / 2, GAME_HEIGHT / 2);
 
-    const overlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x06061a, 0.84);
-    overlay.setInteractive();
+    addGlassPanel(this, GAME_WIDTH / 2, GAME_HEIGHT / 2, 540, 340, "#ffd166");
+    addSceneTitle(this, GAME_WIDTH / 2, GAME_HEIGHT / 2 - 110, `LEVEL ${data.levelNumber} CLEAR`);
 
-    addGlassPanel(this, GAME_WIDTH / 2, GAME_HEIGHT / 2, 540, 328, COLORS.neonGold, 0.9);
+    addCssText(this, GAME_WIDTH / 2, GAME_HEIGHT / 2 - 60,
+      `Containment secured. ${data.totalLevels - data.levelNumber} sections remaining.`,
+      { size: 13, color: "#9bb0c8", weight: 500, letterSpacing: 1, width: 480 });
 
-    const headline = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 110, `LEVEL ${data.levelNumber} CLEAR`, {
-      fontFamily: FONT_FAMILY,
-      fontStyle: "900",
-      fontSize: "30px",
-      color: "#ffd166",
-      stroke: "#06061a",
-      strokeThickness: 5,
-    });
-    headline.setOrigin(0.5);
-
-    const sub = this.add.text(
-      GAME_WIDTH / 2,
-      GAME_HEIGHT / 2 - 76,
-      `Containment secured.  ${data.totalLevels - data.levelNumber} sections remaining.`,
-      {
-        fontFamily: FONT_FAMILY,
-        fontSize: "13px",
-        color: "#9bb0c8",
-      }
-    );
-    sub.setOrigin(0.5);
-
-    const lines = [
+    this.buildStatsRow(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 16, [
       { label: "SCORE", value: formatScore(data.score), color: "#e7f6ff" },
       { label: "SCRAP", value: `${data.scrap}`, color: "#ffd166" },
       { label: "BEST CHAIN", value: `x${data.bestCombo}`, color: "#ff6cf2" },
-    ];
-    lines.forEach((line, idx) => {
-      const y = GAME_HEIGHT / 2 - 30 + idx * 36;
-      const lbl = this.add.text(GAME_WIDTH / 2 - 130, y, line.label, {
-        fontFamily: FONT_FAMILY,
-        fontStyle: "bold",
-        fontSize: "14px",
-        color: "#6ffcff",
-      });
-      lbl.setOrigin(0, 0.5);
-      const val = this.add.text(GAME_WIDTH / 2 + 130, y, line.value, {
-        fontFamily: FONT_FAMILY,
-        fontStyle: "900",
-        fontSize: "18px",
-        color: line.color,
-      });
-      val.setOrigin(1, 0.5);
-    });
+    ]);
 
-    addChromeButton(this, GAME_WIDTH / 2, GAME_HEIGHT / 2 + 110, 230, 40, "CONTINUE", COLORS.neonGreen, () => this.advance(data));
+    addChromeButton(this, GAME_WIDTH / 2, GAME_HEIGHT / 2 + 116, 250, 46, "CONTINUE",
+      "#9efc7a", () => this.advance(data));
+
     this.input.keyboard?.once("keydown-ENTER", () => this.advance(data));
     this.input.keyboard?.once("keydown-SPACE", () => this.advance(data));
+  }
+
+  private buildStatsRow(cx: number, cy: number, stats: Array<{ label: string; value: string; color: string }>): void {
+    const rowGap = 38;
+    stats.forEach((s, i) => {
+      const y = cy + i * rowGap;
+      addCssText(this, cx - 110, y, s.label, {
+        size: 13, color: "#6ffcff", weight: 700, letterSpacing: 3, align: "left", width: 200,
+      });
+      addCssText(this, cx + 110, y, s.value, {
+        size: 20, color: s.color, weight: 900, letterSpacing: 1, align: "right", width: 200,
+      });
+    });
   }
 
   private advance(data: LevelCompleteData): void {

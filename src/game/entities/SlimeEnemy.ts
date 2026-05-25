@@ -1,8 +1,46 @@
 import Phaser from "phaser";
 import { DEPTH, ENEMY, LOGICAL_SCALE, TEX } from "../constants";
+import { CssVisual } from "../systems/CssVisual";
 import type { ContainmentField } from "./ContainmentField";
 
 export type SlimeKind = "basic" | "bouncer" | "charger" | "shield";
+
+const SLIME_CSS_CLASS: Record<SlimeKind, string> = {
+  basic: "cv-slime cv-slime-basic",
+  bouncer: "cv-slime cv-slime-bouncer",
+  charger: "cv-slime cv-slime-charger",
+  shield: "cv-slime cv-slime-shield",
+};
+
+const SLIME_INNER_HTML: Record<SlimeKind, string> = {
+  basic: `
+    <div class="slime-shadow"></div>
+    <div class="slime-body"></div>
+    <div class="slime-eyes"><span></span><span></span></div>
+    <div class="slime-mouth"></div>
+  `,
+  bouncer: `
+    <div class="slime-shadow"></div>
+    <div class="slime-crown"></div>
+    <div class="slime-body"></div>
+    <div class="slime-eyes"><span></span><span></span></div>
+    <div class="slime-mouth"></div>
+  `,
+  charger: `
+    <div class="slime-shadow"></div>
+    <div class="slime-crown"></div>
+    <div class="slime-body"></div>
+    <div class="slime-eyes"><span></span><span></span></div>
+    <div class="slime-mouth"></div>
+  `,
+  shield: `
+    <div class="slime-shadow"></div>
+    <div class="slime-crown"></div>
+    <div class="slime-body"></div>
+    <div class="slime-eyes"><span></span><span></span></div>
+    <div class="slime-mouth"></div>
+  `,
+};
 
 /**
  * Base class for every slime mutant.  Each subclass overrides `aiTick()` to
@@ -19,6 +57,7 @@ export abstract class SlimeEnemy extends Phaser.Physics.Arcade.Sprite {
   public direction: 1 | -1 = 1;
 
   protected savedGravity = true;
+  protected visual!: CssVisual;
   private platformGroup: Phaser.Physics.Arcade.StaticGroup | null = null;
 
   constructor(scene: Phaser.Scene, x: number, y: number, kind: SlimeKind, textureKey: string) {
@@ -34,6 +73,13 @@ export abstract class SlimeEnemy extends Phaser.Physics.Arcade.Sprite {
     this.syncBodyToTexture();
     this.bornAt = scene.time.now;
     this.direction = Math.random() < 0.5 ? -1 : 1;
+
+    // CSS-rendered visual takes over from the Phaser texture.
+    this.setVisible(false);
+    this.visual = new CssVisual(scene, SLIME_CSS_CLASS[kind], {
+      depth: DEPTH.enemy,
+    });
+    this.visual.setHtml(SLIME_INNER_HTML[kind]);
   }
 
   protected syncBodyToTexture(inset = 4): void {
@@ -61,6 +107,8 @@ export abstract class SlimeEnemy extends Phaser.Physics.Arcade.Sprite {
         (1 + Math.sin(time * 0.018) * 0.06) * LOGICAL_SCALE,
         (1 - Math.sin(time * 0.018) * 0.06) * LOGICAL_SCALE
       );
+      this.visual.setState("state", this.state);
+      this.visual.follow(this, LOGICAL_SCALE);
       return;
     }
 
@@ -87,8 +135,10 @@ export abstract class SlimeEnemy extends Phaser.Physics.Arcade.Sprite {
 
     this.aiTick(time, delta);
 
-    // Face direction
+    // Face direction (mirror Phaser flipX into the CSS [data-facing] flip)
     this.setFlipX(this.direction === -1);
+    this.visual.setState("state", "alive");
+    this.visual.follow(this, LOGICAL_SCALE);
   }
 
   protected shouldTurnAtEdge(): boolean {
@@ -160,6 +210,11 @@ export abstract class SlimeEnemy extends Phaser.Physics.Arcade.Sprite {
     }
     return false;
   }
+
+  override destroy(fromScene?: boolean): void {
+    this.visual?.destroy();
+    super.destroy(fromScene);
+  }
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -215,7 +270,7 @@ export class ChargerSlime extends SlimeEnemy {
     switch (this.aiState) {
       case "walk":
         this.body.setVelocityX(ENEMY.chargerWalkSpeed * this.direction);
-        this.clearTint();
+        this.visual.setState("mode", "walk");
         if (time >= this.nextStateAt) {
           this.aiState = "windup";
           this.nextStateAt = time + ENEMY.chargerWindupMs;
@@ -223,8 +278,7 @@ export class ChargerSlime extends SlimeEnemy {
         break;
       case "windup":
         this.body.setVelocityX(0);
-        // Telegraph: yellow flicker
-        this.setTint(Math.floor(time / 80) % 2 === 0 ? 0xffd166 : 0xffffff);
+        this.visual.setState("mode", "windup");
         if (time >= this.nextStateAt) {
           this.aiState = "charge";
           this.nextStateAt = time + 600;
@@ -232,7 +286,7 @@ export class ChargerSlime extends SlimeEnemy {
         break;
       case "charge":
         this.body.setVelocityX(ENEMY.chargerSpeed * this.direction);
-        this.setTint(0xff8866);
+        this.visual.setState("mode", "charge");
         if (
           time >= this.nextStateAt ||
           this.body.blocked.left ||
@@ -240,13 +294,13 @@ export class ChargerSlime extends SlimeEnemy {
         ) {
           this.aiState = "recover";
           this.nextStateAt = time + ENEMY.chargerRecoveryMs;
-          this.clearTint();
           if (this.body.blocked.left) this.direction = 1;
           else if (this.body.blocked.right) this.direction = -1;
         }
         break;
       case "recover":
         this.body.setVelocityX(0);
+        this.visual.setState("mode", "recover");
         if (time >= this.nextStateAt) {
           this.aiState = "walk";
           this.nextStateAt = time + 1200 + Math.random() * 800;
@@ -284,9 +338,10 @@ export class ShieldSlime extends SlimeEnemy {
       this.hp -= 1;
       this.shielded = this.hp > 1;
       if (!this.shielded) {
-        this.setTexture(TEX.slimeBasic);
-        this.syncBodyToTexture();
-        this.setTint(0x9efc7a);
+        // Shield broke — swap the CSS class to the basic body so the
+        // outer shield arch disappears.  Physics body stays the same.
+        this.visual.node.className = `cv ${SLIME_CSS_CLASS.basic}`;
+        this.visual.setHtml(SLIME_INNER_HTML.basic);
       }
     }
     super.onReleased(field);

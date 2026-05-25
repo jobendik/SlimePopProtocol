@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import { COLORS, DEPTH, LOGICAL_SCALE, PLAYER, TEX } from "../constants";
+import { CssVisual } from "../systems/CssVisual";
 import type { ActionState } from "../systems/InputSystem";
 import type { RunModifiers } from "../systems/UpgradeSystem";
 
@@ -25,6 +26,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private thruster?: Phaser.GameObjects.Image;
   private hitFlashTimer?: Phaser.Time.TimerEvent;
   private isJumpHeld = false;
+  private visual: CssVisual;
+  private shootClearAt = 0;
 
   constructor(scene: Phaser.Scene, x: number, y: number, modifiers: RunModifiers) {
     super(scene, x, y, TEX.player);
@@ -54,6 +57,22 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.body.setDragX(PLAYER.drag);
     this.body.allowGravity = true;
     this.setGravityY(0); // arcade-physics global gravity already configured
+
+    // The procedural Phaser texture is replaced by a CSS-rendered DOM
+    // element.  Keep the sprite invisible (physics body still works).
+    this.setVisible(false);
+
+    this.visual = new CssVisual(scene, "cv-player", { depth: DEPTH.player });
+    this.visual.setHtml(`
+      <div class="bot-rails"></div>
+      <div class="bot-legs"></div>
+      <div class="bot-boots"><span></span><span></span></div>
+      <div class="bot-body"></div>
+      <div class="bot-core"></div>
+      <div class="bot-helmet"></div>
+      <div class="bot-visor"></div>
+      <div class="bot-antenna"></div>
+    `);
   }
 
   setModifiers(modifiers: RunModifiers): void {
@@ -124,27 +143,32 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       );
     }
 
-    // Invulnerability flicker
-    if (time < this.invulnerableUntil) {
-      this.setAlpha(0.4 + 0.6 * Math.abs(Math.sin(time * 0.04)));
-    } else {
-      this.setAlpha(1);
-    }
+    // Invulnerability flicker is driven by CSS via data-invuln, so we
+    // keep the sprite alpha pinned at 1 — the DOM mirrors it through
+    // CssVisual.follow and the animation handles the strobe.
+    this.setAlpha(1);
 
     // Shoot input
     let wantShoot = false;
     if (input.shootHeld && time >= this.cooldownUntil) {
       wantShoot = true;
       this.cooldownUntil = time + this.modifiers.fireCooldownMs;
-      this.setTexture(TEX.playerShoot);
+      this.shootClearAt = time + 120;
+      this.visual.setState("shoot", 1);
       this.hitFlashTimer?.remove();
-      this.hitFlashTimer = this.scene.time.delayedCall(80, () => {
-        if (this.active) this.setTexture(TEX.player);
+      this.hitFlashTimer = this.scene.time.delayedCall(120, () => {
+        if (this.active) this.visual.setState("shoot", null);
       });
+    } else if (this.shootClearAt && time >= this.shootClearAt) {
+      this.shootClearAt = 0;
     }
 
     // Thruster glow while falling fast or moving fast
     this.updateThruster(onGround);
+
+    // Mirror state to the CSS visual
+    this.visual.setState("invuln", time < this.invulnerableUntil ? 1 : null);
+    this.visual.follow(this, LOGICAL_SCALE);
 
     return { wantShoot };
   }
@@ -201,6 +225,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
   destroyAll(): void {
     this.thruster?.destroy();
+    this.visual.destroy();
     this.destroy();
   }
 }

@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import { DEPTH, LOGICAL_SCALE, TEX } from "../constants";
+import { CssVisual } from "../systems/CssVisual";
 
 /**
  * Tiny scrap (yellow) or battery (cyan) collectible.  Hops once on spawn,
@@ -14,6 +15,7 @@ export class ScrapPickup extends Phaser.Physics.Arcade.Image {
   private targetX = 0;
   private targetY = 0;
   private targetSet = false;
+  private visual: CssVisual;
 
   constructor(
     scene: Phaser.Scene,
@@ -38,6 +40,16 @@ export class ScrapPickup extends Phaser.Physics.Arcade.Image {
     );
     this.setDepth(DEPTH.pickup);
     this.bornAt = scene.time.now;
+
+    // CSS-rendered pickup
+    this.setVisible(false);
+    if (kind === "battery") {
+      this.visual = new CssVisual(scene, "cv-battery", { depth: DEPTH.pickup });
+      this.visual.setHtml(`<div class="cell"></div><div class="tip"></div>`);
+    } else {
+      this.visual = new CssVisual(scene, "cv-scrap", { depth: DEPTH.pickup });
+      this.visual.setHtml(`<div class="gem"></div>`);
+    }
   }
 
   setMagnetTarget(x: number, y: number): void {
@@ -70,5 +82,12 @@ export class ScrapPickup extends Phaser.Physics.Arcade.Image {
         this.body.setAllowGravity(false);
       }
     }
+
+    this.visual.follow(this, LOGICAL_SCALE);
+  }
+
+  override destroy(fromScene?: boolean): void {
+    this.visual?.destroy();
+    super.destroy(fromScene);
   }
 }

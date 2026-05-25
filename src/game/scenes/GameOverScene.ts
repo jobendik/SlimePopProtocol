@@ -1,9 +1,16 @@
 import Phaser from "phaser";
-import { COLORS, FONT_FAMILY, GAME_HEIGHT, GAME_WIDTH, SCENES } from "../constants";
+import { DEPTH, GAME_HEIGHT, GAME_WIDTH, SCENES } from "../constants";
 import { audio } from "../systems/AudioSystem";
 import { CrazyGamesAdapter } from "../systems/CrazyGamesAdapter";
+import { CssVisual } from "../systems/CssVisual";
 import type { SaveSystem } from "../systems/SaveSystem";
-import { addChromeButton, addGlassPanel, addSceneBackdrop } from "../ui/SceneChrome";
+import {
+  addChromeButton,
+  addCssText,
+  addGlassPanel,
+  addSceneBackdrop,
+  addSceneTitle,
+} from "../ui/SceneChrome";
 import { formatScore } from "../utils/math";
 
 export type GameOverData = {
@@ -27,62 +34,45 @@ export class GameOverScene extends Phaser.Scene {
     save?.recordRun({ level: data.levelReached, score: data.score, scrap: data.scrap });
 
     addSceneBackdrop(this, "danger");
-    const overlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x06061a, 0.55);
-    overlay.setInteractive();
-    addGlassPanel(this, GAME_WIDTH / 2, 285, 540, 350, COLORS.warning, 0.88);
 
-    const headline = this.add.text(GAME_WIDTH / 2, 130, "CONTAINMENT FAILED", {
-      fontFamily: FONT_FAMILY,
-      fontStyle: "900",
-      fontSize: "44px",
-      color: "#ff5577",
-      stroke: "#06061a",
-      strokeThickness: 5,
+    const overlay = new CssVisual(this, "cv-overlay-dim", {
+      depth: DEPTH.hud - 2,
+      pixelWidth: GAME_WIDTH,
+      pixelHeight: GAME_HEIGHT,
     });
-    headline.setOrigin(0.5);
+    overlay.node.style.background = "rgba(6, 6, 26, 0.55)";
+    overlay.node.style.pointerEvents = "auto";
+    overlay.setPosition(GAME_WIDTH / 2, GAME_HEIGHT / 2);
 
-    const sub = this.add.text(GAME_WIDTH / 2, 175, "The slime mutants overpowered your repair bot.", {
-      fontFamily: FONT_FAMILY,
-      fontSize: "14px",
-      color: "#9bb0c8",
-    });
-    sub.setOrigin(0.5);
+    addGlassPanel(this, GAME_WIDTH / 2, 285, 540, 360, "#ff5577");
+    addSceneTitle(this, GAME_WIDTH / 2, 130, "CONTAINMENT FAILED");
 
-    const lines = [
+    addCssText(this, GAME_WIDTH / 2, 178,
+      "The slime mutants overpowered your repair bot.",
+      { size: 13, color: "#9bb0c8", weight: 500, letterSpacing: 1, width: 540 });
+
+    const stats: Array<{ label: string; value: string }> = [
       { label: "REACHED LEVEL", value: `${data.levelReached}` },
-      { label: "FINAL SCORE", value: formatScore(data.score) },
+      { label: "FINAL SCORE",   value: formatScore(data.score) },
       { label: "SCRAP COLLECTED", value: `${data.scrap}` },
     ];
-    lines.forEach((line, idx) => {
-      const y = 240 + idx * 32;
-      const lbl = this.add.text(GAME_WIDTH / 2 - 120, y, line.label, {
-        fontFamily: FONT_FAMILY,
-        fontStyle: "bold",
-        fontSize: "14px",
-        color: "#6ffcff",
+    stats.forEach((s, i) => {
+      const y = 240 + i * 36;
+      addCssText(this, GAME_WIDTH / 2 - 110, y, s.label, {
+        size: 13, color: "#6ffcff", weight: 700, letterSpacing: 3, align: "left", width: 240,
       });
-      lbl.setOrigin(0, 0.5);
-      const val = this.add.text(GAME_WIDTH / 2 + 120, y, line.value, {
-        fontFamily: FONT_FAMILY,
-        fontStyle: "900",
-        fontSize: "18px",
-        color: "#e7f6ff",
+      addCssText(this, GAME_WIDTH / 2 + 110, y, s.value, {
+        size: 20, color: "#e7f6ff", weight: 900, letterSpacing: 1, align: "right", width: 240,
       });
-      val.setOrigin(1, 0.5);
     });
 
-    this.buildButton(GAME_WIDTH / 2, 390, "RETRY", COLORS.neonGreen, () => {
+    addChromeButton(this, GAME_WIDTH / 2 - 130, 405, 230, 46, "RETRY", "#9efc7a", () => {
+      audio.uiClick();
       this.scene.start(SCENES.Game, { level: 0, freshRun: true });
     });
-    this.buildButton(GAME_WIDTH / 2, 440, "MAIN MENU", COLORS.neonCyan, () => {
-      this.scene.start(SCENES.MainMenu);
-    });
-  }
-
-  private buildButton(x: number, y: number, label: string, color: number, cb: () => void): void {
-    addChromeButton(this, x, y, 230, 42, label, color, () => {
+    addChromeButton(this, GAME_WIDTH / 2 + 130, 405, 230, 46, "MAIN MENU", "#6ffcff", () => {
       audio.uiClick();
-      cb();
+      this.scene.start(SCENES.MainMenu);
     });
   }
 }

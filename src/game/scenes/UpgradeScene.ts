@@ -1,19 +1,24 @@
 import Phaser from "phaser";
-import { COLORS, FONT_FAMILY, GAME_HEIGHT, GAME_WIDTH, SCENES } from "../constants";
+import { DEPTH, GAME_HEIGHT, GAME_WIDTH, SCENES } from "../constants";
 import type { UpgradeDef } from "../data/upgrades";
 import { audio } from "../systems/AudioSystem";
 import { CrazyGamesAdapter } from "../systems/CrazyGamesAdapter";
-import { addGlassPanel } from "../ui/SceneChrome";
+import { CssVisual } from "../systems/CssVisual";
+import {
+  addCssHint,
+  addCssText,
+  addGlassPanel,
+  addSceneTitle,
+} from "../ui/SceneChrome";
 
 export type UpgradeSceneData = {
   choices: UpgradeDef[];
-  /** Callback invoked with the chosen upgrade id (or null if none picked). */
   onChosen: (id: UpgradeDef["id"]) => void;
 };
 
 /**
- * Modal upgrade-choice scene.  Pauses the game scene while a choice is made.
- * Pressing 1/2/3 selects the corresponding card.
+ * Modal upgrade-choice scene.  Each choice is a CSS upgrade card with hover
+ * lift + glow.  Press 1/2/3 to pick by keyboard.
  */
 export class UpgradeScene extends Phaser.Scene {
   private choices: UpgradeDef[] = [];
@@ -27,48 +32,37 @@ export class UpgradeScene extends Phaser.Scene {
     this.choices = data.choices;
     this.onChosen = data.onChosen;
 
-    // ad-friendly: this is a safe moment between rounds
     CrazyGamesAdapter.requestMidgameAd();
 
-    const overlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x06061a, 0.84);
-    overlay.setInteractive();
-    addGlassPanel(this, GAME_WIDTH / 2, GAME_HEIGHT / 2 + 18, 820, 420, COLORS.neonCyan, 0.72);
-
-    const title = this.add.text(GAME_WIDTH / 2, 80, "INSTALL UPGRADE MODULE", {
-      fontFamily: FONT_FAMILY,
-      fontStyle: "900",
-      fontSize: "32px",
-      color: "#6ffcff",
-      stroke: "#06061a",
-      strokeThickness: 4,
+    const overlay = new CssVisual(this, "cv-overlay-dim", {
+      depth: DEPTH.hud - 2,
+      pixelWidth: GAME_WIDTH,
+      pixelHeight: GAME_HEIGHT,
     });
-    title.setOrigin(0.5);
+    overlay.node.style.background = "rgba(6, 6, 26, 0.86)";
+    overlay.node.style.pointerEvents = "auto";
+    overlay.setPosition(GAME_WIDTH / 2, GAME_HEIGHT / 2);
 
-    const sub = this.add.text(GAME_WIDTH / 2, 116, "Choose one — the upgrade lasts for the rest of this run", {
-      fontFamily: FONT_FAMILY,
-      fontSize: "13px",
-      color: "#9bb0c8",
-    });
-    sub.setOrigin(0.5);
+    addGlassPanel(this, GAME_WIDTH / 2, GAME_HEIGHT / 2 + 18, 820, 420, "#6ffcff");
+    addSceneTitle(this, GAME_WIDTH / 2, 90, "INSTALL UPGRADE MODULE");
+
+    addCssText(this, GAME_WIDTH / 2, 140,
+      "Choose one — the upgrade lasts for the rest of this run",
+      { size: 13, color: "#9bb0c8", weight: 500, letterSpacing: 1, width: 720 });
 
     const cardWidth = 230;
-    const cardHeight = 280;
+    const cardHeight = 270;
     const spacing = 26;
     const totalWidth = this.choices.length * cardWidth + (this.choices.length - 1) * spacing;
     const startX = (GAME_WIDTH - totalWidth) / 2 + cardWidth / 2;
-    const centerY = GAME_HEIGHT / 2 + 30;
+    const centerY = GAME_HEIGHT / 2 + 40;
 
     this.choices.forEach((def, idx) => {
       const x = startX + idx * (cardWidth + spacing);
       this.buildCard(x, centerY, cardWidth, cardHeight, def, idx + 1);
     });
 
-    const hint = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 40, "Press 1, 2, 3 or click a module", {
-      fontFamily: FONT_FAMILY,
-      fontSize: "12px",
-      color: "#9bb0c8",
-    });
-    hint.setOrigin(0.5);
+    addCssHint(this, GAME_WIDTH / 2, GAME_HEIGHT - 40, "Press 1, 2, 3 or click a module");
 
     ["ONE", "TWO", "THREE"].forEach((key, idx) => {
       this.input.keyboard?.once(`keydown-${key}`, () => this.pick(idx));
@@ -83,62 +77,44 @@ export class UpgradeScene extends Phaser.Scene {
     def: UpgradeDef,
     hotkey: number
   ): void {
-    const card = this.add.rectangle(x, y, w, h, 0x10173a, 0.92);
-    card.setStrokeStyle(2, def.color, 0.88);
-    card.setInteractive({ useHandCursor: true });
-    const shine = this.add.rectangle(x, y - h / 2 + 18, w - 28, 4, def.color, 0.55);
-    const scan = this.add.rectangle(x, y + h / 2 - 20, w - 34, 2, def.color, 0.24);
+    const hex = `#${def.color.toString(16).padStart(6, "0")}`;
+    const r = (def.color >> 16) & 0xff;
+    const g = (def.color >> 8)  & 0xff;
+    const b = def.color & 0xff;
+    const glow = `rgba(${r}, ${g}, ${b}, 0.45)`;
 
-    const hot = this.add.text(x - w / 2 + 12, y - h / 2 + 10, `${hotkey}`, {
-      fontFamily: FONT_FAMILY,
-      fontStyle: "900",
-      fontSize: "20px",
-      color: "#6ffcff",
+    const card = new CssVisual(this, "cv-upgrade-card", {
+      depth: DEPTH.hud,
+      pixelWidth: w,
+      pixelHeight: h,
     });
+    card.node.style.setProperty("--uc-color", hex);
+    card.node.style.setProperty("--uc-glow", glow);
+    card.setHtml(`
+      <div class="uc-frame">
+        <div style="
+          position:absolute;
+          top:8px;
+          left:10px;
+          font-size:18px;
+          font-weight:900;
+          color:#6ffcff;
+          letter-spacing:1px;
+          text-shadow:0 0 4px rgba(111, 252, 255, 0.6);
+        ">${hotkey}</div>
+        <div class="uc-icon">${def.icon}</div>
+        <div class="uc-title">${def.title.toUpperCase()}</div>
+        <div class="uc-desc">${def.description}</div>
+      </div>
+    `);
+    card.setPosition(x, y);
 
-    const icon = this.add.text(x, y - 70, def.icon, {
-      fontFamily: FONT_FAMILY,
-      fontStyle: "900",
-      fontSize: "64px",
-      color: `#${def.color.toString(16).padStart(6, "0")}`,
-    });
-    icon.setOrigin(0.5);
-
-    const name = this.add.text(x, y - 10, def.title, {
-      fontFamily: FONT_FAMILY,
-      fontStyle: "900",
-      fontSize: "20px",
-      color: "#e7f6ff",
-    });
-    name.setOrigin(0.5);
-
-    const desc = this.add.text(x, y + 40, def.description, {
-      fontFamily: FONT_FAMILY,
-      fontSize: "13px",
-      color: "#cfe9ff",
-      wordWrap: { width: w - 40 },
-      align: "center",
-    });
-    desc.setOrigin(0.5);
-
-    card.on("pointerover", () => {
-      card.setStrokeStyle(3, COLORS.neonPink, 1);
-      shine.setFillStyle(COLORS.neonPink, 0.85);
-      scan.setFillStyle(COLORS.neonPink, 0.35);
-      this.tweens.add({ targets: card, scale: 1.04, duration: 140 });
-      this.tweens.add({ targets: [shine, scan, icon, name, desc, hot], scale: 1.04, duration: 140 });
-    });
-    card.on("pointerout", () => {
-      card.setStrokeStyle(2, def.color, 0.8);
-      shine.setFillStyle(def.color, 0.55);
-      scan.setFillStyle(def.color, 0.24);
-      this.tweens.add({ targets: card, scale: 1, duration: 140 });
-      this.tweens.add({ targets: [shine, scan, icon, name, desc, hot], scale: 1, duration: 140 });
-    });
-    card.on("pointerdown", () => {
+    const click = () => {
       audio.upgradeSelected();
       this.confirm(def.id);
-    });
+    };
+    card.node.addEventListener("click", click);
+    card.node.addEventListener("touchend", click);
   }
 
   private pick(idx: number): void {

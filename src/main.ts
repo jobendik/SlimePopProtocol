@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import { createGameConfig } from "./game/config";
 import { SCENES } from "./game/constants";
 import { audio } from "./game/systems/AudioSystem";
+import "./game/styles/game-graphics.css";
 
 function hideBootOverlay(): void {
   const overlay = document.getElementById("boot-overlay");

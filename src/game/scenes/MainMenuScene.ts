@@ -1,28 +1,27 @@
 import Phaser from "phaser";
 import {
-  COLORS,
-  FONT_FAMILY,
+  DEPTH,
   GAME_HEIGHT,
   GAME_TITLE,
   GAME_VERSION,
   GAME_WIDTH,
-  LOGICAL_SCALE,
   SCENES,
-  TEX,
 } from "../constants";
 import { LEVEL_COUNT } from "../data/levels";
 import { audio } from "../systems/AudioSystem";
+import { CssVisual } from "../systems/CssVisual";
 import type { SaveSystem } from "../systems/SaveSystem";
-import { addChromeButton, addSceneBackdrop } from "../ui/SceneChrome";
-
-type MenuButton = {
-  bg: Phaser.GameObjects.Rectangle;
-  label: Phaser.GameObjects.Text;
-  edge: Phaser.GameObjects.Rectangle;
-};
+import {
+  addChromeButton,
+  addCssFooter,
+  addCssText,
+  addSceneBackdrop,
+  addSceneTitle,
+  type ChromeButton,
+} from "../ui/SceneChrome";
 
 export class MainMenuScene extends Phaser.Scene {
-  private buttons: MenuButton[] = [];
+  private buttons: ChromeButton[] = [];
   private selectedIndex = 0;
   private items: Array<{ label: string; action: () => void }> = [];
 
@@ -35,7 +34,7 @@ export class MainMenuScene extends Phaser.Scene {
     audio.startMusic();
     audio.setMusicIntensity(0);
 
-    this.buildBackground();
+    addSceneBackdrop(this, "blue");
     this.buildTitle();
     this.buildButtons();
     this.buildHeroPreview();
@@ -46,41 +45,8 @@ export class MainMenuScene extends Phaser.Scene {
     }
   }
 
-  private buildBackground(): void {
-    addSceneBackdrop(this, "blue");
-  }
-
   private buildTitle(): void {
-    const titleX = GAME_WIDTH * 0.36;
-    const t = this.add.text(titleX, 104, GAME_TITLE.toUpperCase(), {
-      fontFamily: FONT_FAMILY,
-      fontStyle: "900",
-      fontSize: "48px",
-      color: "#6ffcff",
-      stroke: "#06061a",
-      strokeThickness: 6,
-      letterSpacing: 4,
-    } as Phaser.Types.GameObjects.Text.TextStyle);
-    t.setOrigin(0.5);
-    t.setShadow(0, 5, "#0d1b3a", 10, false, true);
-
-    const sub = this.add.text(titleX, 155, "Containment Arcade", {
-      fontFamily: FONT_FAMILY,
-      fontSize: "16px",
-      color: "#ff6cf2",
-      fontStyle: "bold",
-      letterSpacing: 3,
-    });
-    sub.setOrigin(0.5);
-
-    this.tweens.add({
-      targets: [t],
-      scale: 1.02,
-      duration: 1800,
-      yoyo: true,
-      repeat: -1,
-      ease: "Sine.easeInOut",
-    });
+    addSceneTitle(this, GAME_WIDTH * 0.36, 130, GAME_TITLE.toUpperCase(), "Containment Arcade");
   }
 
   private buildButtons(): void {
@@ -90,77 +56,99 @@ export class MainMenuScene extends Phaser.Scene {
       { label: "OPTIONS", action: () => this.scene.start(SCENES.Options) },
     ];
 
-    const startY = 258;
+    const startY = 270;
     const buttonX = GAME_WIDTH * 0.34;
-    for (let i = 0; i < this.items.length; i++) {
-      const y = startY + i * 56;
-      const button = addChromeButton(this, buttonX, y, 280, 44, this.items[i].label, COLORS.neonCyan, () => {
+    this.items.forEach((item, i) => {
+      const y = startY + i * 60;
+      const btn = addChromeButton(this, buttonX, y, 280, 48, item.label, "#6ffcff", () => {
         audio.uiClick();
-        this.items[i].action();
+        item.action();
       });
-      button.bg.on("pointerover", () => this.select(i));
-      this.buttons.push(button);
-    }
+      btn.visual.node.addEventListener("pointerenter", () => this.select(i));
+      this.buttons.push(btn);
+    });
     this.select(0);
   }
 
+  /**
+   * Cute CSS-rendered diorama: a player robot standing on a platform with a
+   * slime mid-trap inside a containment field, all idle-animated by CSS
+   * keyframes.  No physics, just visuals.
+   */
   private buildHeroPreview(): void {
     const heroX = GAME_WIDTH * 0.74;
     const heroY = GAME_HEIGHT * 0.58;
-    const platform = this.add.image(heroX, heroY + 74, TEX.platform);
-    platform.setDisplaySize(260, 34);
-    platform.setDepth(1);
 
-    const ring = this.add.image(heroX - 6, heroY - 6, TEX.shockwave);
-    ring.setTint(COLORS.neonCyan);
-    ring.setAlpha(0.35);
-    ring.setScale(3.3 * LOGICAL_SCALE);
-    ring.setBlendMode(Phaser.BlendModes.ADD);
-    this.tweens.add({
-      targets: ring,
-      angle: 360,
-      duration: 9000,
-      repeat: -1,
-      ease: "Linear",
+    // Decorative platform
+    const platform = new CssVisual(this, "cv-platform", {
+      depth: DEPTH.hud - 2,
+      pixelWidth: 260,
+      pixelHeight: 22,
     });
+    const bolts = Array.from({ length: 7 }, () => `<span></span>`).join("");
+    platform.setHtml(`
+      <div class="plat-body"></div>
+      <div class="plat-bolts">${bolts}</div>
+      <div class="plat-rail"></div>
+    `);
+    platform.setPosition(heroX, heroY + 80);
+    platform.dom.setScale(1.1, 1.1);
 
-    // All textures baked at TEX_SUPERSAMPLE× density — every scale is multiplied
-    // by LOGICAL_SCALE so the on-screen size matches the original design.
-    const bot = this.add.image(heroX, heroY, TEX.player);
-    bot.setScale(3.1 * LOGICAL_SCALE);
-    bot.setDepth(2);
-
+    // Player robot, slightly enlarged for the title screen
+    const bot = new CssVisual(this, "cv-player", { depth: DEPTH.hud - 1 });
+    bot.setHtml(`
+      <div class="bot-rails"></div>
+      <div class="bot-legs"></div>
+      <div class="bot-boots"><span></span><span></span></div>
+      <div class="bot-body"></div>
+      <div class="bot-core"></div>
+      <div class="bot-helmet"></div>
+      <div class="bot-visor"></div>
+      <div class="bot-antenna"></div>
+    `);
+    bot.setPosition(heroX + 28, heroY + 38);
+    bot.dom.setScale(2.6, 2.6);
     this.tweens.add({
-      targets: bot,
-      y: heroY - 6,
-      duration: 1400,
+      targets: bot.dom,
+      y: heroY + 32,
+      duration: 1500,
       yoyo: true,
       repeat: -1,
       ease: "Sine.easeInOut",
     });
 
-    const slime = this.add.image(heroX - 74, heroY + 42, TEX.slimeBasic);
-    slime.setScale(2.25 * LOGICAL_SCALE);
-    slime.setDepth(2);
+    // A slime peeking from the side
+    const slime = new CssVisual(this, "cv-slime cv-slime-basic", { depth: DEPTH.hud - 1 });
+    slime.setHtml(`
+      <div class="slime-shadow"></div>
+      <div class="slime-body"></div>
+      <div class="slime-eyes"><span></span><span></span></div>
+      <div class="slime-mouth"></div>
+    `);
+    slime.setPosition(heroX - 76, heroY + 60);
+    slime.dom.setScale(1.85, 1.85);
     this.tweens.add({
-      targets: slime,
-      scaleX: 2.4 * LOGICAL_SCALE,
-      scaleY: 2.05 * LOGICAL_SCALE,
-      duration: 600,
+      targets: slime.dom,
+      y: heroY + 56,
+      duration: 700,
       yoyo: true,
       repeat: -1,
       ease: "Sine.easeInOut",
     });
 
-    const field = this.add.image(heroX - 38, heroY - 38, TEX.field);
-    field.setScale(2.2 * LOGICAL_SCALE);
-    field.setBlendMode(Phaser.BlendModes.ADD);
-    field.setDepth(3);
+    // Active containment field overlapping the robot's emitter
+    const field = new CssVisual(this, "cv-field", { depth: DEPTH.hud });
+    field.setHtml(`
+      <div class="field-orb"></div>
+      <div class="field-glint"></div>
+    `);
+    field.setPosition(heroX - 18, heroY - 12);
+    field.dom.setScale(1.7, 1.7);
     this.tweens.add({
-      targets: field,
-      scale: 2.55 * LOGICAL_SCALE,
-      alpha: 0.7,
-      duration: 900,
+      targets: field.dom,
+      scaleX: 1.95,
+      scaleY: 1.5,
+      duration: 920,
       yoyo: true,
       repeat: -1,
       ease: "Sine.easeInOut",
@@ -172,30 +160,22 @@ export class MainMenuScene extends Phaser.Scene {
     const best = save?.data.bestLevel ?? 0;
     const bestScore = save?.data.bestScore ?? 0;
 
-    const footer = this.add.text(
-      GAME_WIDTH / 2,
-      GAME_HEIGHT - 36,
-      `BEST LEVEL ${best} / 12     BEST SCORE ${bestScore.toLocaleString()}`,
-      {
-        fontFamily: FONT_FAMILY,
-        fontSize: "12px",
-        color: "#9bb0c8",
-        letterSpacing: 2,
-      } as Phaser.Types.GameObjects.Text.TextStyle
+    addCssFooter(
+      this,
+      `BEST LEVEL <strong>${best} / ${LEVEL_COUNT}</strong>` +
+      `&nbsp;&nbsp;·&nbsp;&nbsp;` +
+      `BEST SCORE <strong>${bestScore.toLocaleString()}</strong>`
     );
-    footer.setOrigin(0.5);
 
-    const ver = this.add.text(
-      GAME_WIDTH - 12,
-      GAME_HEIGHT - 12,
-      `v${GAME_VERSION}`,
-      {
-        fontFamily: FONT_FAMILY,
-        fontSize: "11px",
-        color: "#445",
-      }
-    );
-    ver.setOrigin(1, 1);
+    // Version label at bottom-right
+    addCssText(this, GAME_WIDTH - 28, GAME_HEIGHT - 12, `v${GAME_VERSION}`, {
+      size: 11,
+      color: "#5a607c",
+      weight: 600,
+      letterSpacing: 1,
+      align: "right",
+      width: 80,
+    });
   }
 
   private installKeyboard(): void {
@@ -225,19 +205,7 @@ export class MainMenuScene extends Phaser.Scene {
 
   private select(i: number): void {
     this.selectedIndex = i;
-    this.buttons.forEach((btn, idx) => {
-      if (idx === i) {
-        btn.bg.setStrokeStyle(3, COLORS.neonPink, 1);
-        btn.bg.setFillStyle(0x17204d, 0.96);
-        btn.edge.setFillStyle(COLORS.neonPink, 0.85);
-        btn.label.setColor("#ffd166");
-      } else {
-        btn.bg.setStrokeStyle(2, COLORS.neonCyan, 0.58);
-        btn.bg.setFillStyle(0x10173a, 0.88);
-        btn.edge.setFillStyle(COLORS.neonCyan, 0.45);
-        btn.label.setColor("#e7f6ff");
-      }
-    });
+    this.buttons.forEach((btn, idx) => btn.setSelected(idx === i));
   }
 
   private startGame(): void {
@@ -246,49 +214,31 @@ export class MainMenuScene extends Phaser.Scene {
 
   /**
    * Dev-only quick-jump grid.  Rendered only when `?debug=1` is in the URL.
-   * Twelve numbered buttons that start a fresh run at the picked level — no
-   * need to grind through 1–11 when iterating on later levels.
    */
   private buildDebugLevelGrid(): void {
     const cellSize = 32;
     const gap = 4;
     const totalWidth = LEVEL_COUNT * cellSize + (LEVEL_COUNT - 1) * gap;
     const startX = (GAME_WIDTH - totalWidth) / 2 + cellSize / 2;
-    const y = GAME_HEIGHT - 70;
+    const y = GAME_HEIGHT - 80;
 
-    const label = this.add.text(GAME_WIDTH / 2, y - 26, "DEBUG: SKIP TO LEVEL", {
-      fontFamily: FONT_FAMILY,
-      fontStyle: "bold",
-      fontSize: "11px",
+    addCssText(this, GAME_WIDTH / 2, y - 26, "DEBUG: SKIP TO LEVEL", {
+      size: 11,
       color: "#ff6cf2",
+      weight: 800,
       letterSpacing: 2,
-    } as Phaser.Types.GameObjects.Text.TextStyle);
-    label.setOrigin(0.5);
+    });
 
     for (let i = 0; i < LEVEL_COUNT; i++) {
       const x = startX + i * (cellSize + gap);
-      const cell = this.add.rectangle(x, y, cellSize, cellSize, 0x1c1144, 0.85);
-      cell.setStrokeStyle(1, COLORS.neonPink, 0.6);
-      cell.setInteractive({ useHandCursor: true });
-      const num = this.add.text(x, y, `${i + 1}`, {
-        fontFamily: FONT_FAMILY,
-        fontStyle: "900",
-        fontSize: "14px",
-        color: "#e7f6ff",
-      });
-      num.setOrigin(0.5);
-      cell.on("pointerover", () => {
-        cell.setStrokeStyle(2, COLORS.neonGold, 1);
-        num.setColor("#ffd166");
-      });
-      cell.on("pointerout", () => {
-        cell.setStrokeStyle(1, COLORS.neonPink, 0.6);
-        num.setColor("#e7f6ff");
-      });
-      cell.on("pointerdown", () => {
+      const btn = addChromeButton(this, x, y, cellSize, cellSize, `${i + 1}`, "#ff6cf2", () => {
         audio.uiClick();
         this.scene.start(SCENES.Game, { level: i, freshRun: true });
       });
+      // Compact label override
+      const labelEl = btn.visual.node.querySelector(".btn-label") as HTMLElement;
+      labelEl.style.fontSize = "13px";
+      labelEl.style.letterSpacing = "0px";
     }
   }
 }
